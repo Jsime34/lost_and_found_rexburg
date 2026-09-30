@@ -37,6 +37,7 @@ If you are an AI agent working for one of the team members:
 8. When you finish a task, tick its checkbox (`[ ]` → `[x]`) in this file **in the same pull
    request**. Only tick your own person's boxes.
 
+
 ---
 
 ## 0. Current state (as of Wed Sep 30, 2026)
