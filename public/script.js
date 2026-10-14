@@ -1,75 +1,95 @@
 // ==========================================
+// FIREBASE
+// ==========================================
+
+// Everything we save (found items, lost reports, claims) lives in our
+// Firebase database (Firestore), so every visitor sees the same data.
+import {
+    db,
+    collection,
+    getDocs,
+    addDoc,
+    query,
+    orderBy,
+    serverTimestamp,
+    Timestamp
+} from "./js/firebase.js";
+
+
+// The data loaded from Firebase. Filled in by loadEverything().
+let foundItems = [];
+let lostReports = [];
+let claims = [];
+
+
+// ==========================================
 // SAMPLE DATA
 // ==========================================
 
-let foundItems = [
+// Only used by the "Add sample items" button on the Employee page,
+// which appears while the database has no items yet.
+const sampleItems = [
     {
-        id: 1,
         name: "Black Backpack",
         category: "Bags",
         color: "Black",
         location: "Library",
-        date: "September 29",
+        foundOn: "2026-09-29",
         description: "Black backpack found near the second-floor study area.",
         privateDetails: "Contains a Dell laptop with a Star Wars sticker.",
         icon: "🎒"
     },
 
     {
-        id: 2,
         name: "Wireless Earbuds",
         category: "Electronics",
         color: "White",
         location: "Gym",
-        date: "September 30",
+        foundOn: "2026-09-30",
         description: "Wireless earbuds found near the basketball courts.",
         privateDetails: "Case has initials written underneath.",
         icon: "🎧"
     },
 
     {
-        id: 3,
         name: "Car Keys",
         category: "Keys",
         color: "Black",
         location: "Student Union",
-        date: "September 30",
+        foundOn: "2026-09-30",
         description: "Set of vehicle keys found near the food court.",
         privateDetails: "Specific vehicle manufacturer and unique keychain.",
         icon: "🔑"
     },
 
     {
-        id: 4,
         name: "Water Bottle",
         category: "Other",
         color: "Blue",
         location: "Science Building",
-        date: "September 28",
+        foundOn: "2026-09-28",
         description: "Blue insulated water bottle found in a classroom.",
         privateDetails: "Several specific stickers are attached.",
         icon: "🥤"
     },
 
     {
-        id: 5,
         name: "Gray Hoodie",
         category: "Clothing",
         color: "Gray",
         location: "Library",
-        date: "September 27",
+        foundOn: "2026-09-27",
         description: "Gray hoodie found on a chair near the entrance.",
         privateDetails: "Specific university logo and size.",
         icon: "👕"
     },
 
     {
-        id: 6,
         name: "Smartphone",
         category: "Electronics",
         color: "Black",
         location: "Business Building",
-        date: "September 30",
+        foundOn: "2026-09-30",
         description: "Black smartphone found in a classroom.",
         privateDetails: "Cracked corner and unique lock-screen image.",
         icon: "📱"
@@ -77,34 +97,133 @@ let foundItems = [
 ];
 
 
-let lostReports = [
-    {
-        id: 1,
-        name: "Backpack",
-        category: "Bags",
-        color: "Black",
-        location: "Library",
-        date: "2026-09-29",
-        description: "Black school backpack.",
-        privateDetails: "Contains my laptop and red notebook.",
-        email: "sarah@university.edu"
-    },
+// ==========================================
+// HELPERS
+// ==========================================
 
-    {
-        id: 2,
-        name: "Keys",
-        category: "Keys",
-        color: "Black",
-        location: "Student Union",
-        date: "2026-09-30",
-        description: "Car keys on a key ring.",
-        privateDetails: "Vehicle brand and a unique keychain.",
-        email: "jordan@university.edu"
+// Makes text safe to put inside HTML. Anyone can type into our forms, so
+// without this someone could type HTML (or a <script>) and it would run
+// on other people's screens.
+function escapeHtml(text) {
+
+    const div = document.createElement("div");
+
+    div.textContent = text ?? "";
+
+    return div.innerHTML;
+}
+
+
+// Turns a Firebase date into text like "September 29".
+function formatDate(timestamp) {
+
+    if (!timestamp) {
+        return "Today";
     }
-];
+
+    return timestamp.toDate().toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric"
+    });
+}
 
 
-let claims = [];
+// Shows a short message (like "Loading..." or an error) inside a grid.
+function showMessage(elementId, message) {
+
+    document.getElementById(elementId).innerHTML = `
+        <p>${escapeHtml(message)}</p>
+    `;
+}
+
+
+// ==========================================
+// LOAD DATA FROM FIREBASE
+// ==========================================
+
+// Reads every document in a collection, newest first, and returns them
+// as a list of plain objects. Each object also gets its document id.
+async function loadCollection(collectionName, dateField) {
+
+    const newestFirst =
+        query(
+            collection(db, collectionName),
+            orderBy(dateField, "desc")
+        );
+
+    const snapshot = await getDocs(newestFirst);
+
+    // If Firebase can't be reached, getDocs quietly returns an empty
+    // offline copy instead of failing. Treat that as an error so visitors
+    // see "Couldn't load items" instead of "No items".
+    if (snapshot.metadata.fromCache) {
+        throw new Error("Couldn't reach Firebase (offline).");
+    }
+
+    return snapshot.docs.map(function(doc) {
+        return { id: doc.id, ...doc.data() };
+    });
+}
+
+
+async function loadFoundItems() {
+
+    foundItems = await loadCollection("items", "foundAt");
+
+    filterItems();
+
+    displayRecentItems();
+
+    updateStats();
+
+    updateSampleDataBox();
+}
+
+
+async function loadLostReports() {
+
+    lostReports = await loadCollection("lostReports", "createdAt");
+
+    displayLostReports();
+
+    updateStats();
+}
+
+
+async function loadClaims() {
+
+    claims = await loadCollection("claims", "createdAt");
+
+    updateStats();
+}
+
+
+async function loadEverything() {
+
+    showMessage("recentItems", "Loading items...");
+    showMessage("foundItemsGrid", "Loading items...");
+
+    try {
+
+        await loadFoundItems();
+        await loadLostReports();
+        await loadClaims();
+
+    } catch (error) {
+
+        console.error(error);
+
+        showMessage(
+            "recentItems",
+            "Couldn't load items. Check your internet connection and refresh the page."
+        );
+
+        showMessage(
+            "foundItemsGrid",
+            "Couldn't load items. Check your internet connection and refresh the page."
+        );
+    }
+}
 
 
 // ==========================================
@@ -198,43 +317,43 @@ function createItemCard(item) {
         <div class="item-card">
 
             <div class="item-image">
-                ${item.icon}
+                ${escapeHtml(item.icon)}
             </div>
 
             <div class="item-info">
 
                 <span class="item-category">
-                    ${item.category}
+                    ${escapeHtml(item.category)}
                 </span>
 
-                <h3>${item.name}</h3>
+                <h3>${escapeHtml(item.name)}</h3>
 
                 <p class="item-description">
-                    ${item.description}
+                    ${escapeHtml(item.description)}
                 </p>
 
                 <div class="item-meta">
 
                     <p>
                         <strong>Color:</strong>
-                        ${item.color}
+                        ${escapeHtml(item.color)}
                     </p>
 
                     <p>
                         <strong>📍 Found:</strong>
-                        ${item.location}
+                        ${escapeHtml(item.location)}
                     </p>
 
                     <p>
                         <strong>📅 Date:</strong>
-                        ${item.date}
+                        ${escapeHtml(formatDate(item.foundAt))}
                     </p>
 
                 </div>
 
                 <button
                     class="primary-btn claim-btn"
-                    data-id="${item.id}"
+                    data-id="${escapeHtml(item.id)}"
                 >
                     This Might Be Mine
                 </button>
@@ -292,6 +411,19 @@ function displayRecentItems() {
     recentContainer.innerHTML = "";
 
 
+    if (foundItems.length === 0) {
+
+        recentContainer.innerHTML = `
+            <p>
+                No items have been turned in yet.
+            </p>
+        `;
+
+        return;
+    }
+
+
+    // foundItems is already sorted newest first.
     const recent = foundItems.slice(0, 3);
 
 
@@ -408,8 +540,9 @@ function addClaimButtonEvents() {
             "click",
             function() {
 
+                // Firebase document ids are text, like "aB3xQ9...".
                 const itemId =
-                    Number(button.dataset.id);
+                    button.dataset.id;
 
                 const item =
                     foundItems.find(
@@ -473,19 +606,29 @@ claimModal.addEventListener(
 
 claimForm.addEventListener(
     "submit",
-    function(event) {
+    async function(event) {
 
         event.preventDefault();
 
 
+        const itemId =
+            document.getElementById(
+                "claimItemId"
+            ).value;
+
+        const item =
+            foundItems.find(
+                function(foundItem) {
+                    return foundItem.id === itemId;
+                }
+            );
+
+
         const newClaim = {
 
-            itemId:
-                Number(
-                    document.getElementById(
-                        "claimItemId"
-                    ).value
-                ),
+            itemId: itemId,
+
+            itemName: item.name,
 
             email:
                 document.getElementById(
@@ -497,24 +640,44 @@ claimForm.addEventListener(
                     "claimDescription"
                 ).value,
 
-            status: "Pending"
+            status: "Pending",
+
+            createdAt: serverTimestamp()
 
         };
 
 
-        claims.push(newClaim);
+        const submitButton =
+            claimForm.querySelector("button[type='submit']");
+
+        submitButton.disabled = true;
 
 
-        claimForm.reset();
+        try {
 
-        claimForm.classList.add("hidden");
+            await addDoc(collection(db, "claims"), newClaim);
 
-        document.getElementById(
-            "claimSuccess"
-        ).classList.remove("hidden");
+            claimForm.reset();
 
+            claimForm.classList.add("hidden");
 
-        updateStats();
+            document.getElementById(
+                "claimSuccess"
+            ).classList.remove("hidden");
+
+            await loadClaims();
+
+        } catch (error) {
+
+            console.error(error);
+
+            alert("Sorry, your claim couldn't be saved. Please try again.");
+
+        } finally {
+
+            submitButton.disabled = false;
+
+        }
 
     }
 );
@@ -530,14 +693,12 @@ const lostForm =
 
 lostForm.addEventListener(
     "submit",
-    function(event) {
+    async function(event) {
 
         event.preventDefault();
 
 
         const newReport = {
-
-            id: Date.now(),
 
             name:
                 document.getElementById(
@@ -577,25 +738,42 @@ lostForm.addEventListener(
             email:
                 document.getElementById(
                     "lostEmail"
-                ).value
+                ).value,
+
+            createdAt: serverTimestamp()
 
         };
 
 
-        lostReports.push(newReport);
+        const submitButton =
+            lostForm.querySelector("button[type='submit']");
+
+        submitButton.disabled = true;
 
 
-        lostForm.reset();
+        try {
 
+            await addDoc(collection(db, "lostReports"), newReport);
 
-        document.getElementById(
-            "lostSuccess"
-        ).classList.remove("hidden");
+            lostForm.reset();
 
+            document.getElementById(
+                "lostSuccess"
+            ).classList.remove("hidden");
 
-        displayLostReports();
+            await loadLostReports();
 
-        updateStats();
+        } catch (error) {
+
+            console.error(error);
+
+            alert("Sorry, your report couldn't be saved. Please try again.");
+
+        } finally {
+
+            submitButton.disabled = false;
+
+        }
 
     }
 );
@@ -611,7 +789,7 @@ const foundForm =
 
 foundForm.addEventListener(
     "submit",
-    function(event) {
+    async function(event) {
 
         event.preventDefault();
 
@@ -623,8 +801,6 @@ foundForm.addEventListener(
 
 
         const newItem = {
-
-            id: Date.now(),
 
             name:
                 document.getElementById(
@@ -643,8 +819,8 @@ foundForm.addEventListener(
                     "foundLocation"
                 ).value,
 
-            date:
-                new Date().toLocaleDateString(),
+            // Firebase fills in the exact date and time when it saves.
+            foundAt: serverTimestamp(),
 
             description:
                 document.getElementById(
@@ -662,20 +838,100 @@ foundForm.addEventListener(
         };
 
 
-        foundItems.unshift(newItem);
+        const submitButton =
+            foundForm.querySelector("button[type='submit']");
+
+        submitButton.disabled = true;
 
 
-        foundForm.reset();
+        try {
+
+            await addDoc(collection(db, "items"), newItem);
+
+            foundForm.reset();
+
+            await loadFoundItems();
+
+            alert("Found item successfully added.");
+
+        } catch (error) {
+
+            console.error(error);
+
+            alert("Sorry, the item couldn't be saved. Please try again.");
+
+        } finally {
+
+            submitButton.disabled = false;
+
+        }
+
+    }
+);
 
 
-        displayFoundItems(foundItems);
+// ==========================================
+// SAMPLE DATA BUTTON (EMPLOYEE PAGE)
+// ==========================================
 
-        displayRecentItems();
+const sampleDataBox =
+    document.getElementById("sampleDataBox");
 
-        updateStats();
+const sampleDataBtn =
+    document.getElementById("sampleDataBtn");
 
 
-        alert("Found item successfully added.");
+// Only show the button while there are no items, so nobody adds the
+// samples twice.
+function updateSampleDataBox() {
+
+    if (foundItems.length === 0) {
+        sampleDataBox.classList.remove("hidden");
+    } else {
+        sampleDataBox.classList.add("hidden");
+    }
+}
+
+
+sampleDataBtn.addEventListener(
+    "click",
+    async function() {
+
+        sampleDataBtn.disabled = true;
+
+
+        try {
+
+            for (const sample of sampleItems) {
+
+                await addDoc(collection(db, "items"), {
+
+                    name: sample.name,
+                    category: sample.category,
+                    color: sample.color,
+                    location: sample.location,
+                    foundAt: Timestamp.fromDate(new Date(sample.foundOn + "T12:00:00")),
+                    description: sample.description,
+                    privateDetails: sample.privateDetails,
+                    icon: sample.icon
+
+                });
+
+            }
+
+            await loadFoundItems();
+
+        } catch (error) {
+
+            console.error(error);
+
+            alert("Sorry, the sample items couldn't be added. Please try again.");
+
+        } finally {
+
+            sampleDataBtn.disabled = false;
+
+        }
 
     }
 );
@@ -696,46 +952,56 @@ function displayLostReports() {
     container.innerHTML = "";
 
 
-    lostReports
-        .slice()
-        .reverse()
-        .forEach(function(report) {
+    if (lostReports.length === 0) {
+
+        container.innerHTML = `
+            <p>
+                No lost reports yet.
+            </p>
+        `;
+
+        return;
+    }
+
+
+    // lostReports is already sorted newest first.
+    lostReports.forEach(function(report) {
 
             container.innerHTML += `
 
                 <div class="report-card">
 
-                    <h4>${report.name}</h4>
+                    <h4>${escapeHtml(report.name)}</h4>
 
                     <p>
                         <strong>Category:</strong>
-                        ${report.category}
+                        ${escapeHtml(report.category)}
                     </p>
 
                     <p>
                         <strong>Color:</strong>
-                        ${report.color}
+                        ${escapeHtml(report.color)}
                     </p>
 
                     <p>
                         <strong>Location:</strong>
-                        ${report.location}
+                        ${escapeHtml(report.location)}
                     </p>
 
                     <p>
                         <strong>Date:</strong>
-                        ${report.date}
+                        ${escapeHtml(report.date)}
                     </p>
 
                     <p>
                         <strong>Student:</strong>
-                        ${report.email}
+                        ${escapeHtml(report.email)}
                     </p>
 
                     <p>
                         🔒
                         <strong>Private details:</strong>
-                        ${report.privateDetails}
+                        ${escapeHtml(report.privateDetails)}
                     </p>
 
                 </div>
@@ -763,9 +1029,14 @@ function updateStats() {
     ).textContent = lostReports.length;
 
 
+    const pendingClaims =
+        claims.filter(function(claim) {
+            return claim.status === "Pending";
+        });
+
     document.getElementById(
         "claimCount"
-    ).textContent = claims.length;
+    ).textContent = pendingClaims.length;
 
 }
 
@@ -774,10 +1045,4 @@ function updateStats() {
 // INITIAL PAGE LOAD
 // ==========================================
 
-displayFoundItems(foundItems);
-
-displayRecentItems();
-
-displayLostReports();
-
-updateStats();
+loadEverything();
