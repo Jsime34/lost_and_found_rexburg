@@ -4,22 +4,39 @@
 
 // Everything we save (found items, lost reports, claims) lives in our
 // Firebase database (Firestore), so every visitor sees the same data.
+//
+// Who can read what is decided by the security rules in firestore.rules:
+//   - everyone can see found items (but not their private details)
+//   - only logged-in employees can see private details, lost reports and claims
 import {
     db,
+    auth,
     collection,
+    doc,
+    getDoc,
     getDocs,
     addDoc,
     query,
     orderBy,
     serverTimestamp,
-    Timestamp
+    Timestamp,
+    writeBatch,
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    signOut
 } from "./js/firebase.js";
 
 
-// The data loaded from Firebase. Filled in by loadEverything().
+// Public data (everyone). Filled in by loadEverything().
 let foundItems = [];
+
+// Employee-only data. Filled in by loadEmployeeData() after an employee logs in.
 let lostReports = [];
 let claims = [];
+let itemSecrets = {};   // private details of each found item, by item id
+
+// The logged-in employee ({ name, email }), or null for visitors.
+let currentEmployee = null;
 
 
 // ==========================================
@@ -141,17 +158,18 @@ function showMessage(elementId, message) {
 // LOAD DATA FROM FIREBASE
 // ==========================================
 
-// Reads every document in a collection, newest first, and returns them
-// as a list of plain objects. Each object also gets its document id.
+// Reads every document in a collection and returns them as a list of
+// plain objects. Each object also gets its document id.
+// If dateField is given, the list is sorted by it, newest first.
 async function loadCollection(collectionName, dateField) {
 
-    const newestFirst =
-        query(
-            collection(db, collectionName),
-            orderBy(dateField, "desc")
-        );
+    let whatToRead = collection(db, collectionName);
 
-    const snapshot = await getDocs(newestFirst);
+    if (dateField) {
+        whatToRead = query(whatToRead, orderBy(dateField, "desc"));
+    }
+
+    const snapshot = await getDocs(whatToRead);
 
     // If Firebase can't be reached, getDocs quietly returns an empty
     // offline copy instead of failing. Treat that as an error so visitors
@@ -180,13 +198,25 @@ async function loadFoundItems() {
 }
 
 
+// ----- Employee-only data -----
+
+async function loadItemSecrets() {
+
+    const secrets = await loadCollection("itemSecrets");
+
+    itemSecrets = {};
+
+    secrets.forEach(function(secret) {
+        itemSecrets[secret.id] = secret.privateDetails;
+    });
+}
+
+
 async function loadLostReports() {
 
     lostReports = await loadCollection("lostReports", "createdAt");
 
     displayLostReports();
-
-    updateStats();
 }
 
 
@@ -194,9 +224,39 @@ async function loadClaims() {
 
     claims = await loadCollection("claims", "createdAt");
 
-    updateStats();
+    displayClaims();
 }
 
+
+async function loadEmployeeData() {
+
+    showMessage("adminLostReports", "Loading lost reports...");
+    showMessage("adminClaims", "Loading claims...");
+
+    try {
+
+        await loadItemSecrets();
+        await loadLostReports();
+        await loadClaims();
+
+    } catch (error) {
+
+        console.error(error);
+
+        showMessage(
+            "adminLostReports",
+            "Couldn't load lost reports. Refresh the page to try again."
+        );
+
+        showMessage(
+            "adminClaims",
+            "Couldn't load claims. Refresh the page to try again."
+        );
+    }
+}
+
+
+// ----- Public data (runs for every visitor when the page opens) -----
 
 async function loadEverything() {
 
@@ -206,8 +266,6 @@ async function loadEverything() {
     try {
 
         await loadFoundItems();
-        await loadLostReports();
-        await loadClaims();
 
     } catch (error) {
 
@@ -665,7 +723,10 @@ claimForm.addEventListener(
                 "claimSuccess"
             ).classList.remove("hidden");
 
-            await loadClaims();
+            // Only employees are allowed to read claims.
+            if (currentEmployee) {
+                await loadClaims();
+            }
 
         } catch (error) {
 
@@ -761,7 +822,10 @@ lostForm.addEventListener(
                 "lostSuccess"
             ).classList.remove("hidden");
 
-            await loadLostReports();
+            // Only employees are allowed to read lost reports.
+            if (currentEmployee) {
+                await loadLostReports();
+            }
 
         } catch (error) {
 
@@ -783,6 +847,27 @@ lostForm.addEventListener(
 // EMPLOYEE ADDS FOUND ITEM
 // ==========================================
 
+// Saves a found item in two places at once:
+//   items/{id}        the public part (everyone can read it)
+//   itemSecrets/{id}  the private details (employees only)
+// A "batch" saves both or neither, so an item is never saved half-way.
+async function saveItemWithSecret(publicItem, privateDetails) {
+
+    const batch = writeBatch(db);
+
+    // Make a new item document so we know its id before saving.
+    const itemRef = doc(collection(db, "items"));
+
+    batch.set(itemRef, publicItem);
+
+    batch.set(doc(db, "itemSecrets", itemRef.id), {
+        privateDetails: privateDetails
+    });
+
+    await batch.commit();
+}
+
+
 const foundForm =
     document.getElementById("foundForm");
 
@@ -800,6 +885,7 @@ foundForm.addEventListener(
             ).value;
 
 
+        // Public part: everyone can see this.
         const newItem = {
 
             name:
@@ -827,15 +913,17 @@ foundForm.addEventListener(
                     "foundPublic"
                 ).value,
 
-            privateDetails:
-                document.getElementById(
-                    "foundPrivate"
-                ).value,
-
             icon:
                 getIcon(category)
 
         };
+
+
+        // Private part: only employees can see this (see firestore.rules).
+        const privateDetails =
+            document.getElementById(
+                "foundPrivate"
+            ).value;
 
 
         const submitButton =
@@ -846,11 +934,13 @@ foundForm.addEventListener(
 
         try {
 
-            await addDoc(collection(db, "items"), newItem);
+            await saveItemWithSecret(newItem, privateDetails);
 
             foundForm.reset();
 
             await loadFoundItems();
+
+            await loadItemSecrets();
 
             alert("Found item successfully added.");
 
@@ -904,22 +994,23 @@ sampleDataBtn.addEventListener(
 
             for (const sample of sampleItems) {
 
-                await addDoc(collection(db, "items"), {
-
+                const publicItem = {
                     name: sample.name,
                     category: sample.category,
                     color: sample.color,
                     location: sample.location,
                     foundAt: Timestamp.fromDate(new Date(sample.foundOn + "T12:00:00")),
                     description: sample.description,
-                    privateDetails: sample.privateDetails,
                     icon: sample.icon
+                };
 
-                });
+                await saveItemWithSecret(publicItem, sample.privateDetails);
 
             }
 
             await loadFoundItems();
+
+            await loadItemSecrets();
 
         } catch (error) {
 
@@ -1014,9 +1105,85 @@ function displayLostReports() {
 
 
 // ==========================================
+// DISPLAY CLAIMS FOR EMPLOYEES
+// ==========================================
+
+function displayClaims() {
+
+    const container =
+        document.getElementById(
+            "adminClaims"
+        );
+
+
+    container.innerHTML = "";
+
+
+    if (claims.length === 0) {
+
+        container.innerHTML = `
+            <p>
+                No claims yet.
+            </p>
+        `;
+
+        return;
+    }
+
+
+    // claims is already sorted newest first.
+    claims.forEach(function(claim) {
+
+        // What we know about the item but never showed the public.
+        const privateDetails =
+            itemSecrets[claim.itemId] || "No private details on file.";
+
+        container.innerHTML += `
+
+            <div class="report-card">
+
+                <h4>${escapeHtml(claim.itemName)}</h4>
+
+                <p>
+                    <strong>Status:</strong>
+                    ${escapeHtml(claim.status)}
+                </p>
+
+                <p>
+                    <strong>Student:</strong>
+                    ${escapeHtml(claim.email)}
+                </p>
+
+                <p>
+                    <strong>Sent:</strong>
+                    ${escapeHtml(formatDate(claim.createdAt))}
+                </p>
+
+                <p>
+                    <strong>What they say:</strong>
+                    ${escapeHtml(claim.verification)}
+                </p>
+
+                <p class="private-note">
+                    🔒
+                    <strong>Private details on file:</strong>
+                    ${escapeHtml(privateDetails)}
+                </p>
+
+            </div>
+
+        `;
+
+    });
+
+}
+
+
+// ==========================================
 // UPDATE HOME PAGE STATISTICS
 // ==========================================
 
+// Only uses public data (found items), so it works for every visitor.
 function updateStats() {
 
     document.getElementById(
@@ -1024,21 +1191,184 @@ function updateStats() {
     ).textContent = foundItems.length;
 
 
-    document.getElementById(
-        "lostCount"
-    ).textContent = lostReports.length;
+    const oneWeekAgo =
+        Date.now() - 7 * 24 * 60 * 60 * 1000;
 
-
-    const pendingClaims =
-        claims.filter(function(claim) {
-            return claim.status === "Pending";
+    const foundThisWeek =
+        foundItems.filter(function(item) {
+            return item.foundAt && item.foundAt.toMillis() >= oneWeekAgo;
         });
 
     document.getElementById(
-        "claimCount"
-    ).textContent = pendingClaims.length;
+        "weekCount"
+    ).textContent = foundThisWeek.length;
+
+
+    // Count each place only once, even if it has several items.
+    const places =
+        new Set(
+            foundItems.map(function(item) {
+                return item.location;
+            })
+        );
+
+    document.getElementById(
+        "placesCount"
+    ).textContent = places.size;
 
 }
+
+
+// ==========================================
+// EMPLOYEE LOG IN / LOG OUT
+// ==========================================
+
+const employeeLogin =
+    document.getElementById("employeeLogin");
+
+const employeeDashboard =
+    document.getElementById("employeeDashboard");
+
+const loginForm =
+    document.getElementById("loginForm");
+
+const loginError =
+    document.getElementById("loginError");
+
+
+function showLoginError(message) {
+
+    loginError.textContent = message;
+
+    loginError.classList.remove("hidden");
+}
+
+
+loginForm.addEventListener(
+    "submit",
+    async function(event) {
+
+        event.preventDefault();
+
+        loginError.classList.add("hidden");
+
+
+        const submitButton =
+            loginForm.querySelector("button[type='submit']");
+
+        submitButton.disabled = true;
+
+
+        try {
+
+            await signInWithEmailAndPassword(
+                auth,
+                document.getElementById("loginEmail").value,
+                document.getElementById("loginPassword").value
+            );
+
+            loginForm.reset();
+
+            // onAuthStateChanged (below) shows the dashboard.
+
+        } catch (error) {
+
+            console.error(error);
+
+            if (error.code === "auth/too-many-requests") {
+                showLoginError("Too many tries. Wait a few minutes and try again.");
+            } else {
+                showLoginError("Wrong email or password.");
+            }
+
+        } finally {
+
+            submitButton.disabled = false;
+
+        }
+
+    }
+);
+
+
+document.getElementById("logoutBtn").addEventListener(
+    "click",
+    function() {
+        signOut(auth);
+    }
+);
+
+
+// Firebase calls this when the page opens and every time someone
+// logs in or out.
+onAuthStateChanged(auth, async function(user) {
+
+    currentEmployee = null;
+
+
+    if (user) {
+
+        try {
+
+            // Employees have a users/{uid} document with role "admin".
+            // These are only created by hand in the Firebase console.
+            const userDoc =
+                await getDoc(doc(db, "users", user.uid));
+
+            if (userDoc.exists() && userDoc.data().role === "admin") {
+
+                currentEmployee = {
+                    name: userDoc.data().name || user.email,
+                    email: user.email
+                };
+
+            } else {
+
+                showLoginError(
+                    "This account isn't on the employee list. Ask the site admin to add it."
+                );
+
+                await signOut(auth);
+
+                return;
+            }
+
+        } catch (error) {
+
+            console.error(error);
+
+            showLoginError("Couldn't check your account. Please try again.");
+
+            return;
+        }
+
+    }
+
+
+    if (currentEmployee) {
+
+        document.getElementById("employeeName").textContent =
+            currentEmployee.name;
+
+        employeeLogin.classList.add("hidden");
+        employeeDashboard.classList.remove("hidden");
+
+        await loadEmployeeData();
+
+    } else {
+
+        employeeDashboard.classList.add("hidden");
+        employeeLogin.classList.remove("hidden");
+
+        // Forget employee-only data so it doesn't stay on the screen.
+        lostReports = [];
+        claims = [];
+        itemSecrets = {};
+        displayLostReports();
+        displayClaims();
+    }
+
+});
 
 
 // ==========================================

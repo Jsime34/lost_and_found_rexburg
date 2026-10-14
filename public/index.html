@@ -19,51 +19,583 @@
                 <p>Find items turned in around campus.</p>
             </div>
         </div>
-        <nav aria-label="Main navigation">
-            <a class="nav-btn active" href="index.html">Search</a>
-            <a class="nav-btn" href="map.html">Map</a>
-            <a class="nav-btn" href="login.html">Log in</a>
+        <nav>
+            <button class="nav-btn active" data-page="home">Home</button>
+            <button class="nav-btn" data-page="browse">Found Items</button>
+            <button class="nav-btn" data-page="lost">Report Lost Item</button>
+            <button class="nav-btn" data-page="admin">Employees</button>
         </nav>
     </header>
 
     <main>
-        <section class="page-title">
-            <span class="eyebrow">SEARCH</span>
-            <h2>Find your lost item</h2>
-            <p>Search the items currently recorded by Rexburg lost-and-found desks.</p>
+        <!-- =========================
+             HOME PAGE
+        ========================== -->
+        <section id="home" class="page active-page">
+
+            <div class="hero">
+                <div class="hero-text">
+                    <span class="eyebrow">CAMPUS SERVICES</span>
+
+                    <h2>Lose something?</h2>
+
+                    <p>
+                        Search items that have been turned in or create a lost-item
+                        report so Campus Lost & Found can help find a match.
+                    </p>
+
+                    <div class="hero-buttons">
+                        <button class="primary-btn" data-go="browse">
+                            🔎 Search Found Items
+                        </button>
+
+                        <button class="secondary-btn" data-go="lost">
+                            + Report Lost Item
+                        </button>
+                    </div>
+                </div>
+
+                <div class="hero-card">
+                    <div class="big-icon">🔑</div>
+                    <h3>Found something?</h3>
+                    <p>
+                        Turn the item in at Campus Lost & Found. Employees will
+                        record it so its owner can find it.
+                    </p>
+                </div>
+            </div>
+
+
+            <div class="stats">
+                <div class="stat-card">
+                    <span>📦</span>
+                    <strong id="foundCount">0</strong>
+                    <p>Unclaimed Items</p>
+                </div>
+
+                <div class="stat-card">
+                    <span>🆕</span>
+                    <strong id="weekCount">0</strong>
+                    <p>Found This Week</p>
+                </div>
+
+                <div class="stat-card">
+                    <span>📍</span>
+                    <strong id="placesCount">0</strong>
+                    <p>Places With Items</p>
+                </div>
+            </div>
+
+
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">RECENTLY FOUND</span>
+                    <h2>Has anyone seen your stuff?</h2>
+                </div>
+
+                <button class="text-btn" data-go="browse">
+                    View all →
+                </button>
+            </div>
+
+            <div id="recentItems" class="item-grid"></div>
+
+        <!-- =========================
+             BROWSE FOUND ITEMS
+        ========================== -->
+        <section id="browse" class="page">
+            <div class="page-title">
+                <span class="eyebrow">SEARCH</span>
+                <h2>Found Items</h2>
+                <p>Browse items that have been turned in. Some details are intentionally hidden to help verify ownership.</p>
+            </div>
+            <div class="search-panel">
+                <input type="text" id="searchInput" placeholder="Search backpack, keys, headphones...">
+                <select id="categoryFilter">
+                    <option value="all">All Categories</option>
+                    <option value="Electronics">Electronics</option>
+                    <option value="Bags">Bags</option>
+                    <option value="Keys">Keys</option>
+                    <option value="Clothing">Clothing</option>
+                    <option value="Accessories">Accessories</option>
+                    <option value="Other">Other</option>
+                </select>
+                <select id="locationFilter">
+                    <option value="all">All Locations</option>
+                    <option value="Library">Library</option>
+                    <option value="Student Union">Student Union</option>
+                    <option value="Science Building">Science Building</option>
+                    <option value="Gym">Gym</option>
+                    <option value="Business Building">Business Building</option>
+                </select>
+            </div>
+            <p id="resultsText" class="results-text"></p>
+            <div id="foundItemsGrid" class="item-grid"></div>
         </section>
 
-        <form id="searchForm" class="search-panel" aria-label="Search found items">
-            <label class="sr-only" for="keywordSearch">Search words</label>
-            <input id="keywordSearch" type="search" placeholder="Search type, color, brand, or description...">
 
-            <label class="sr-only" for="typeFilter">Type</label>
-            <select id="typeFilter"><option value="">All types</option></select>
+        <!-- =========================
+             REPORT LOST ITEM
+        ========================== -->
+        <section id="lost" class="page">
 
-            <label class="sr-only" for="colorFilter">Color</label>
-            <select id="colorFilter"><option value="">All colors</option></select>
+            <div class="form-container">
 
-            <label class="sr-only" for="brandFilter">Brand</label>
-            <select id="brandFilter"><option value="">All brands</option></select>
+                <div class="page-title">
+                    <span class="eyebrow">LOST SOMETHING?</span>
+                    <h2>Create a Lost Item Report</h2>
 
-            <label class="sr-only" for="locationFilter">Location</label>
-            <select id="locationFilter"><option value="">All locations</option></select>
+                    <p>
+                        Tell us what you lost. We'll compare your report against
+                        items that have been turned in.
+                    </p>
+                </div>
 
-            <label class="sr-only" for="sortOrder">Sort order</label>
-            <select id="sortOrder">
-                <option value="newest">Newest first</option>
-                <option value="oldest">Oldest first</option>
-            </select>
 
-            <button class="secondary-btn" id="clearSearch" type="button">Clear filters</button>
-        </form>
+                <form id="lostForm">
 
-        <p id="resultsText" class="results-text" aria-live="polite">Loading items...</p>
-        <div id="searchMessage" class="report-card hidden" role="status"></div>
-        <div id="resultsGrid" class="item-grid" aria-live="polite"></div>
+                    <div class="form-row">
+
+                        <div class="form-group">
+                            <label for="lostName">Item Name</label>
+                            <input
+                                id="lostName"
+                                maxlength="100"
+                                type="text"
+                                placeholder="Example: Black backpack"
+                                required
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="lostCategory">Category</label>
+
+                            <select id="lostCategory" required>
+                                <option value="">Choose category</option>
+                                <option>Electronics</option>
+                                <option>Bags</option>
+                                <option>Keys</option>
+                                <option>Clothing</option>
+                                <option>Accessories</option>
+                                <option>Other</option>
+                            </select>
+                        </div>
+
+                    </div>
+
+
+                    <div class="form-row">
+
+                        <div class="form-group">
+                            <label for="lostColor">Color</label>
+
+                            <input
+                                id="lostColor"
+                                maxlength="50"
+                                type="text"
+                                placeholder="Example: Black"
+                                required
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="lostLocation">Where did you lose it?</label>
+
+                            <select id="lostLocation" required>
+                                <option value="">Choose location</option>
+                                <option>Library</option>
+                                <option>Student Union</option>
+                                <option>Science Building</option>
+                                <option>Gym</option>
+                                <option>Business Building</option>
+                            </select>
+                        </div>
+
+                    </div>
+
+
+                    <div class="form-group">
+                        <label for="lostDate">Approximate Date Lost</label>
+                        <input id="lostDate" type="date" required>
+                    </div>
+
+
+                    <div class="form-group">
+                        <label for="lostDescription">
+                            Public Description
+                        </label>
+
+                        <textarea
+                            id="lostDescription"
+                            maxlength="1000"
+                            rows="3"
+                            placeholder="General description of the item..."
+                            required
+                        ></textarea>
+                    </div>
+
+
+                    <div class="form-group private-field">
+
+                        <label for="lostPrivate">
+                            🔒 Private Identifying Details
+                        </label>
+
+                        <p>
+                            These details are only visible to employees and can
+                            help prove the item belongs to you.
+                        </p>
+
+                        <textarea
+                            id="lostPrivate"
+                            maxlength="1000"
+                            rows="4"
+                            placeholder="Example: My laptop inside has a Star Wars sticker..."
+                            required
+                        ></textarea>
+
+                    </div>
+
+
+                    <div class="form-group">
+                        <label for="lostEmail">University Email</label>
+
+                        <input
+                            id="lostEmail"
+                            maxlength="200"
+                            type="email"
+                            placeholder="student@university.edu"
+                            required
+                        >
+                    </div>
+
+
+                    <button type="submit" class="primary-btn submit-btn">
+                        Submit Lost Report
+                    </button>
+
+                </form>
+
+
+                <div id="lostSuccess" class="success-message hidden">
+                    <div class="success-icon">✓</div>
+
+                    <div>
+                        <h3>Lost report submitted!</h3>
+                        <p>
+                            Your report has been added and we'll look for
+                            possible matches.
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =========================
+             EMPLOYEE / ADMIN PAGE
+        ========================== -->
+        <section id="admin" class="page">
+
+            <div class="page-title">
+                <span class="eyebrow">EMPLOYEE PORTAL</span>
+                <h2>Lost & Found Dashboard</h2>
+                <p>
+                    Lost & found staff only. Log in to record found items and
+                    review lost reports and claims.
+                </p>
+            </div>
+
+
+            <!-- EMPLOYEE LOG IN (shown while no employee is logged in) -->
+            <div id="employeeLogin" class="form-container login-box">
+
+                <h3>Employee Log In</h3>
+
+                <form id="loginForm">
+
+                    <div class="form-group">
+                        <label for="loginEmail">Email</label>
+                        <input
+                            id="loginEmail"
+                            type="email"
+                            autocomplete="username"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="loginPassword">Password</label>
+                        <input
+                            id="loginPassword"
+                            type="password"
+                            autocomplete="current-password"
+                            required
+                        >
+                    </div>
+
+                    <button type="submit" class="primary-btn submit-btn">
+                        Log In
+                    </button>
+
+                </form>
+
+                <p id="loginError" class="error-message hidden"></p>
+
+            </div>
+
+
+            <!-- EMPLOYEE DASHBOARD (shown only to logged-in employees) -->
+            <div id="employeeDashboard" class="hidden">
+
+            <div class="employee-bar">
+                <p>
+                    Logged in as <strong id="employeeName"></strong>
+                </p>
+
+                <button id="logoutBtn" type="button" class="secondary-btn">
+                    Log Out
+                </button>
+            </div>
+
+
+            <div class="admin-layout">
+
+                <!-- ADD FOUND ITEM -->
+                <div class="admin-panel">
+
+                    <h3>Record Found Item</h3>
+
+                    <!-- Shown only while the database has no items (see script.js). -->
+                    <div id="sampleDataBox" class="report-card hidden">
+                        <p>
+                            The database is empty. Add a few sample items so
+                            the site has something to show.
+                        </p>
+
+                        <button id="sampleDataBtn" type="button" class="secondary-btn">
+                            Add sample items
+                        </button>
+                    </div>
+
+                    <form id="foundForm">
+
+                        <div class="form-group">
+                            <label for="foundName">Item Name</label>
+                            <input
+                                id="foundName"
+                                maxlength="100"
+                                type="text"
+                                placeholder="Black backpack"
+                                required
+                            >
+                        </div>
+
+
+                        <div class="form-row">
+
+                            <div class="form-group">
+                                <label for="foundCategory">Category</label>
+
+                                <select id="foundCategory" required>
+                                    <option value="">Choose category</option>
+                                    <option>Electronics</option>
+                                    <option>Bags</option>
+                                    <option>Keys</option>
+                                    <option>Clothing</option>
+                                    <option>Accessories</option>
+                                    <option>Other</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="foundColor">Color</label>
+                                <input id="foundColor" type="text" maxlength="50" required>
+                            </div>
+
+                        </div>
+
+
+                        <div class="form-group">
+                            <label for="foundLocation">Location Found</label>
+
+                            <select id="foundLocation" required>
+                                <option value="">Choose location</option>
+                                <option>Library</option>
+                                <option>Student Union</option>
+                                <option>Science Building</option>
+                                <option>Gym</option>
+                                <option>Business Building</option>
+                            </select>
+                        </div>
+
+
+                        <div class="form-group">
+                            <label for="foundPublic">
+                                Public Description
+                            </label>
+
+                            <textarea
+                                id="foundPublic"
+                                maxlength="1000"
+                                rows="3"
+                                placeholder="Information students are allowed to see."
+                                required
+                            ></textarea>
+                        </div>
+
+
+                        <div class="form-group private-field">
+
+                            <label for="foundPrivate">
+                                🔒 Private Verification Details
+                            </label>
+
+                            <textarea
+                                id="foundPrivate"
+                                maxlength="1000"
+                                rows="3"
+                                placeholder="Details only employees should see."
+                                required
+                            ></textarea>
+
+                        </div>
+
+
+                        <button type="submit" class="primary-btn">
+                            Add Found Item
+                        </button>
+
+                    </form>
+
+                </div>
+
+
+                <!-- LOST REPORTS -->
+                <div class="admin-panel">
+
+                    <h3>Recent Lost Reports</h3>
+
+                    <div id="adminLostReports"></div>
+
+                </div>
+
+
+                <!-- CLAIMS -->
+                <div class="admin-panel wide-panel">
+
+                    <h3>Claims to Review</h3>
+
+                    <p class="panel-note">
+                        Compare what the student says with the private details
+                        on file before giving the item back.
+                    </p>
+
+                    <div id="adminClaims"></div>
+
+                </div>
+
+            </div>
+
+            </div>
+            <!-- END EMPLOYEE DASHBOARD -->
+
+        </section>
+
     </main>
 
-    <footer><p>Rexburg Lost &amp; Found</p></footer>
-    <script type="module" src="js/search.js"></script>
+    <!-- =========================
+         CLAIM MODAL
+    ========================== -->
+    <div id="claimModal" class="modal hidden">
+
+        <div class="modal-content">
+
+            <button id="closeModal" class="close-btn">×</button>
+
+            <span class="eyebrow">OWNERSHIP CLAIM</span>
+
+            <h2 id="claimItemTitle">Claim Item</h2>
+
+            <p>
+                Tell Lost & Found something about the item that wouldn't be
+                obvious from the public listing.
+            </p>
+
+
+            <form id="claimForm">
+
+                <input type="hidden" id="claimItemId">
+
+
+                <div class="form-group">
+
+                    <label for="claimEmail">
+                        University Email
+                    </label>
+
+                    <input
+                        id="claimEmail"
+                        maxlength="200"
+                        type="email"
+                        placeholder="student@university.edu"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label for="claimDescription">
+                        How can we verify this belongs to you?
+                    </label>
+
+                    <textarea
+                        id="claimDescription"
+                        maxlength="2000"
+                        rows="5"
+                        placeholder="Describe stickers, contents, scratches, keychains, lock screen, etc."
+                        required
+                    ></textarea>
+
+                </div>
+
+
+                <button type="submit" class="primary-btn">
+                    Submit Claim
+                </button>
+
+            </form>
+
+
+            <div id="claimSuccess" class="success-message hidden">
+
+                <div class="success-icon">✓</div>
+
+                <div>
+                    <h3>Claim submitted!</h3>
+                    <p>
+                        A Lost & Found employee will review your information.
+                    </p>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <footer>
+        <p>Campus Lost & Found • Software Development Class Prototype</p>
+    </footer>
+
+
+    <!-- type="module" lets script.js import from js/firebase.js -->
+    <script type="module" src="script.js"></script>
+
 </body>
 </html>

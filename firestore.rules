@@ -1,0 +1,103 @@
+rules_version = '2';
+
+// Security rules: Firebase checks these on EVERY read and write to our database.
+// The website's code can't skip them, so this is what really protects our data.
+//
+// Who is who:
+//   - Visitor:  anyone using the website (not logged in).
+//   - Employee: someone who logged in on the Employees page AND has a document
+//               users/{their uid} with role "admin". Those documents are only
+//               created by hand in the Firebase console.
+//
+// Deploy changes with:  firebase deploy --only firestore:rules
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Helpers ----------
+
+    function isEmployee() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
+    // Text that isn't empty and isn't longer than maxLength characters.
+    function isText(value, maxLength) {
+      return value is string && value.size() > 0 && value.size() <= maxLength;
+    }
+
+    // A lost report sent from the "Report Lost Item" form.
+    function isValidLostReport() {
+      let report = request.resource.data;
+      let fields = ["name", "category", "color", "location", "date",
+                    "description", "privateDetails", "email", "createdAt"];
+
+      return report.keys().hasOnly(fields)
+        && report.keys().hasAll(fields)
+        && isText(report.name, 100)
+        && isText(report.category, 50)
+        && isText(report.color, 50)
+        && isText(report.location, 100)
+        && isText(report.date, 20)
+        && isText(report.description, 1000)
+        && isText(report.privateDetails, 1000)
+        && isText(report.email, 200)
+        && report.createdAt == request.time;
+    }
+
+    // A claim sent from the "This Might Be Mine" popup.
+    function isValidClaim() {
+      let claim = request.resource.data;
+      let fields = ["itemId", "itemName", "email", "verification", "status", "createdAt"];
+
+      return claim.keys().hasOnly(fields)
+        && claim.keys().hasAll(fields)
+        && isText(claim.itemId, 100)
+        && isText(claim.itemName, 100)
+        && isText(claim.email, 200)
+        && isText(claim.verification, 2000)
+        && claim.status == "Pending"
+        && claim.createdAt == request.time
+        && exists(/databases/$(database)/documents/items/$(claim.itemId));
+    }
+
+    // ---------- Collections ----------
+
+    // Employee list. You can read only your own entry (so the website can
+    // check whether you're an employee). Nobody can change it from the website.
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false;
+    }
+
+    // Found items: everyone can see them, only employees can change them.
+    // Private details must NOT be saved here; they go in itemSecrets.
+    match /items/{itemId} {
+      allow read: if true;
+      allow create, update: if isEmployee()
+        && !("privateDetails" in request.resource.data);
+      allow delete: if isEmployee();
+    }
+
+    // Private details of found items (same document id as the item).
+    // Employees only.
+    match /itemSecrets/{itemId} {
+      allow read, write: if isEmployee();
+    }
+
+    // Lost reports: anyone can send one, only employees can read them.
+    match /lostReports/{reportId} {
+      allow create: if isValidLostReport();
+      allow read, update, delete: if isEmployee();
+    }
+
+    // Claims: anyone can send one, only employees can read them.
+    match /claims/{claimId} {
+      allow create: if isValidClaim();
+      allow read, update, delete: if isEmployee();
+    }
+
+    // Anything not listed above is blocked.
+  }
+}
