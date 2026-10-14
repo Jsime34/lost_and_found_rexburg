@@ -1,17 +1,19 @@
 # Rexburg Lost & Found: Master Plan
 
-An app that helps people in Rexburg, Idaho find their lost items. It lists every lost & found
-location on campus. Admins log each found item with its characteristics (color, brand, type,
-photo), and users run a filtered search to see which lost & found has their item.
+An app that helps people in Rexburg, Idaho find their lost items. Employees log each found item with
+its characteristics (type, color, brand, photo), and students search with filters to see which
+lost & found has their item, how long it has been there, and claim it.
 
-For example, if someone lost a blue Hydro Flask water bottle, the admin enters *blue*,
-*Hydro Flask* and *water bottle*. The user searches with those same filters and sees which desk
-has it and how long it has been there.
+For example, if someone lost a blue Hydro Flask water bottle, the employee enters *blue*,
+*Hydro Flask* and *water bottle*. The student searches with those same filters and sees where it is.
 
 **Team:** Evan (Jared Evan Jenson) · Trevor Beckstrand · Braden Griffiths · Jaime Gutierrez Zevallos
 
-**Status:** Planning. No code yet. This is a 101-level class project, so the plan uses basic
-web technology (HTML, CSS, JavaScript) and Firebase to go live.
+**Live site:** https://rexburg-lost-and-found.web.app
+
+**Status:** Week 3 of 10. The site is live and connected to Firebase, with security rules and an
+employee login. Now: building the remaining features (§R). This is a 101-level class project, so
+we use basic web technology (HTML, CSS, JavaScript) and Firebase.
 
 ---
 
@@ -21,189 +23,205 @@ If you are an AI agent working for one of the team members:
 
 1. **Ask your human which team member they are** (Evan, Trevor, Braden or Jaime). Don't guess from
    git usernames.
-2. Read **§0 Current state**, then **your person's section in §R Roles**.
+2. Read **§0 Current state**, **§4 Files**, then **your person's section in §R Roles**.
 3. Work on the **first unchecked task** in your person's section, unless your human picks another.
 4. **Keep the code at a 101 level.**
    - Plain HTML, CSS and JavaScript only: no React or other frameworks, no TypeScript, no build
      tools, no npm packages in the website.
    - Only the libraries in §1, loaded from their links.
    - Short, clear functions with comments, so every teammate can read them.
-5. **Only edit files your person owns** (see §4 and their section). For shared files, get your
-   human's OK and have them tell the team before merging.
-6. Tasks marked **(human)** need a real person (meetings, Firebase console, GitHub settings).
+5. **Avoid editing other people's code** (see §4).
+   - Put new code in **your own file** under `public/js/`, and import it from `script.js` with
+     one line.
+   - In `index.html`, `script.js` and `styles.css`, only change your own sections. For anything
+     else, get your human's OK and have them tell the team first.
+6. **Data and security:**
+   - Follow [`docs/DATA.md`](docs/DATA.md). Any new collection or field goes there first.
+   - Then add it to `firestore.rules`, in the same pull request. Without that, Firebase will
+     reject the save.
+   - Always put text from the database on the page with `escapeHtml()`.
+7. **The live database is shared.** Live Server on your computer uses the **real** database. Test
+   with obviously fake data, and delete it when you're done.
+8. Tasks marked **(human)** need a real person (meetings, Firebase console, GitHub settings).
    Remind your human about them; don't try to do them yourself.
-7. Follow the data model in §2 and `docs/DATA.md` (once it exists). If something there seems
-   wrong, tell your human instead of working around it.
-8. When you finish a task, tick its checkbox (`[ ]` → `[x]`) in this file **in the same pull
+9. When you finish a task, tick its checkbox (`[ ]` → `[x]`) in this file **in the same pull
    request**. Only tick your own person's boxes.
-
 
 ---
 
-## 0. Current state (as of Wed Sep 30, 2026)
+## 0. Current state (as of Wed Oct 14, 2026)
 
-- The repo has:
-  - `README.md`: title and Evan's name
-  - `compiler.json`: empty; added in commit `782acfd` ("stertin"). The new plan doesn't need it.
-  - `MASTER_PLAN.md`: this file
-- **Sep 30:** the team switched to a simpler plan: basic HTML/CSS/JavaScript plus Firebase. It
-  replaces the earlier React/Express version.
-- No Firebase project, no code, and no `docs/DATA.md` yet.
-- **Next steps, in order:**
-  1. Jaime creates the Firebase project and adds everyone.
-  2. Evan sets up the project folder and the first live page.
-  3. Everyone else starts their week 1 tasks.
+**Working on the live site:**
+- **Home page:** intro, stats (unclaimed items, found this week, places with items), recent items
+- **Found Items:** search by text, plus category and location filters
+- **Report Lost Item:** students send a lost report
+- **"This Might Be Mine":** students send a claim with their email and a description
+- **Employees page:**
+  - log in (employee accounts only)
+  - record a found item, with private details kept employee-only
+  - "Add sample items" button, shown when the database is empty
+  - list of lost reports
+  - list of claims, shown next to each item's private details
+- **Security rules:** visitors can't read private details, lost reports, claims or the employee
+  list, and only employees can change items
+
+**Not built yet** (see §R):
+- time counter
+- map
+- edit/remove items
+- photos
+- brand and color filters
+- request for a friend
+- approving claims
+- recording pickups
+
+**History:**
+- **Sep 23–30:** plan written, then simplified to HTML/CSS/JS + Firebase.
+- **Oct 7:** first front end (Trevor), Firebase Hosting set up (Evan).
+- **Oct 14:**
+  - connected to the database (pull request #2)
+  - security rules, employee login and private details (#3)
+  - deployed
+
+**The code is one page.** `index.html` has sections that the nav buttons show and hide, and
+`script.js` holds the code. This replaced the earlier idea of separate HTML pages.
 
 ---
 
 ## §R. Roles
 
-| Person | Setup role (week 1) | Feature (weeks 2–4 and on) |
+| Person | Owns | Remaining focus |
 |---|---|---|
-| **Evan** | Setup lead: Firebase folder setup, first live page, deploys | **WS1** Search & item page |
-| **Trevor** | Database lead: security rules, sample data | **WS2** Admin items & photos |
-| **Braden** | Design lead: shared style, header/footer, page files | **WS3** Locations, map & time counter |
-| **Jaime** | Coordinator: GitHub, Firebase project, `docs/DATA.md`, login | **WS4** Requests & pickups |
+| **Evan** | Search, item cards, lost reports, deploy setup | Brand/color filters, sort, time counter on cards, hide picked-up items, README |
+| **Trevor** | Employee item tools, photos, security rules | Edit/remove/donate items, photos, brand + color dropdown |
+| **Braden** | Design, locations, map, time counter | Real locations, map page, time counter, mobile fixes, then help Jaime |
+| **Jaime** | Coordination, Firebase, login, claims & pickups | Request for a friend, approve/reject claims, record pickups, pickup log |
 
-**Week 1 order:**
-1. Jaime creates the Firebase project (today)
-2. Evan's setup
-3. Then, at the same time: Trevor's rules + sample data, Braden's style + page files, Jaime's login
-4. By Fri, the site is live, and everyone can log in on it
+**Order that matters (weeks 3–4):**
+- **Early this week:**
+  - **Braden's `locations.js` + `time.js`.** Evan needs them for the cards; Braden's map needs the locations.
+  - **Trevor's `status`, `brand` and color dropdown.** Evan's filters need them.
+- **Jaime's pickups** set item `status` to `picked_up`, and Evan hides those items.
 
-### Evan: setup lead + WS1 Search & item page
-
-**Owns:**
-- `firebase.json`, `.firebaserc`, `public/js/firebase.js`
-- WS1: `public/index.html`, `public/js/search.js`, `public/item.html`, `public/js/item.js`
-
-**Week 1**
-- [ ] (human) Install the Firebase tools (`npm install -g firebase-tools`), then run `firebase login`.
-- [ ] (human) Ask who added `compiler.json` and whether it's still needed. If not, delete it in the setup pull request.
-- [ ] **Everyone is waiting on this.** Set up the project folder:
-  - run `firebase init`, choosing Hosting (folder `public`) and Firestore
-  - create `public/js/firebase.js` with the web config from the Firebase console; it starts Firebase and shares `auth` and `db` with every page
-- [ ] Put a simple "Coming soon" `index.html` live with `firebase deploy`, and post the live link in team chat.
-- [ ] Add a short "How to run it" section to `README.md`: open the folder in VS Code, use the Live Server extension, and deploy with `firebase deploy`.
-- [ ] (human) In Firebase console → Authentication → Settings → Authorized domains, add `127.0.0.1` so logging in works with Live Server.
-
-**Weeks 2–4 (WS1)**
-- [ ] Search page (`index.html` + `search.js`)
-  - load the available items once, then filter them in JavaScript by type, color, brand, location and typed words
-  - sort by newest or oldest
-- [ ] Result cards: photo, title, color, brand, location, and how long the item has been there (Braden's `time.js`).
-- [ ] Messages for "loading…", "no items match" and errors.
-- [ ] Item page (`item.html?id=…`)
-  - photo, all details, the time counter, the location's hours, and a link to the map
-  - a "Request this item" button that goes to `request.html?item=…` (Jaime's page)
-
-**Others wait on you for:** the Firebase setup and `firebase.js` (everyone, early week 1).
-**You wait on:** Trevor's sample data and Braden's `time.js`.
-
-### Trevor: database lead + WS2 Admin items & photos
+### Evan: search & item cards
 
 **Owns:**
-- `firestore.rules`
-- `public/seed.html` + `public/js/seed.js`
-- WS2: `public/admin-items.html`, `public/js/admin-items.js`
+- **`index.html`:** the `#browse` section (Found Items), the `#lost` section (Report Lost Item), and the "Recent Lost Reports" panel inside `#admin`
+- **`script.js`:** the sections "ITEM ICON", "CREATE ITEM CARD", "DISPLAY FOUND ITEMS", "RECENT ITEMS", "SEARCH / FILTER", "LOST ITEM FORM", "DISPLAY LOST REPORTS FOR EMPLOYEES"
+- `firebase.json`, `.firebaserc`, `README.md`
+- New file `public/js/search.js` if search code grows
 
-**Week 1 (after Evan's setup)**
-- [ ] First version of `firestore.rules`, based on §2 and `docs/DATA.md`:
-  - anyone can read items and locations; only admins can change them
-  - users can create and read only their own requests; admins can read and update all requests
-  - pickups are admin only
-  - nobody can make themselves an admin
-- [ ] `seed.html`: an admin-only page with an "Add sample data" button.
-  - It adds the locations (Braden's real ones if ready, otherwise marked DEMO) and about 15 items.
-  - Post in team chat when sample data is in.
+**Done**
+- [x] (human) Install the Firebase tools and run `firebase login`.
+- [x] Set up Firebase Hosting (`firebase init`) and put the first site live.
+- [x] Delete the unused `compiler.json`.
 
-**Weeks 2–4 (WS2)**
-- [ ] Admin items page (`admin-items.html`), admins only: a form to add an item.
-  - fields: title, type, color, brand, description, where found, date found, location (dropdown), photo
-- [ ] Photo: shrink it in the browser (about 400 px wide, JPEG) before saving, so it stays small (see §7).
-- [ ] A list of all items with **Edit**, **Remove** and **Mark as donated** buttons.
-- [ ] Update `firestore.rules` whenever someone adds a collection or field.
+**Week 3–4**
+- [ ] Add a "How to run it" section to `README.md`:
+  - open the folder in VS Code and use the **Live Server** extension
+  - Live Server uses the real database
+  - deploy only from `main` with `firebase deploy`
+- [ ] (human) Firebase console → Authentication → Settings → Authorized domains: add `127.0.0.1`, so employee login works with Live Server.
+- [ ] Color filter: a dropdown next to Category, using the same color list as Trevor's form.
+- [ ] Search also matches `brand` (after Trevor adds it), and the card shows the brand.
+- [ ] Sort: "Newest first" / "Oldest first" dropdown.
+- [ ] Cards show "In lost & found for 3 days · 27 days left" using Braden's `time.js`.
+- [ ] Hide items whose `status` is `picked_up` or `donated`. A missing status counts as available.
+- [ ] Cards show the item's `photo` when it has one (after Trevor adds photos), and the emoji otherwise.
 
-**Others wait on you for:**
-- security rules (everyone, before real data goes in)
-- sample data (Evan and Jaime, end of week 1)
+**Others wait on you for:** brand/color filters and sort before the week 5 full-flow check.
+**You wait on:**
+- Braden: `time.js` and `locations.js`
+- Trevor: the `status`, `brand` and `photo` fields
 
-**You wait on:** Evan's setup, Jaime's `auth.js` (for the admin check).
-
-### Braden: design lead + WS3 Locations, map & time counter
+### Trevor: employee item tools, photos & security rules
 
 **Owns:**
-- `public/css/style.css`, `public/js/nav.js`, `public/js/time.js`
-- WS3: `public/map.html`, `public/js/map.js`, `public/admin-locations.html`, `public/js/admin-locations.js`
+- **`index.html`:** the "Record Found Item" panel inside `#admin`
+- **`script.js`:** the sections "SAMPLE DATA", "EMPLOYEE ADDS FOUND ITEM" and "SAMPLE DATA BUTTON (EMPLOYEE PAGE)"
+- `firestore.rules` (reviews every rules change), `styles.css` (shared with Braden)
+- New file `public/js/admin-items.js` for the new item tools
 
-**Week 1 (after Evan's setup)**
+**Done**
+- [x] First front end: the page layout, forms and stylesheet.
+- [x] First version of `firestore.rules`, written with Jaime in pull request #3.
+- [x] "Add sample items" button.
+
+**Week 3–4**
+- [ ] "Record Found Item" form:
+  - add a **Brand** field
+  - change **Color** to a dropdown with a fixed list (share the list with Evan)
+- [ ] New items get `status: "available"`.
+- [ ] Employee list of all items (new panel), with buttons:
+  - **Edit**
+  - **Remove**, which also deletes its `itemSecrets` document, in one batch
+  - **Mark as donated**, which sets `status: "donated"`
+- [ ] Photo on the form:
+  - shrink it in the browser to about 400 px wide (JPEG, using a canvas)
+  - save it as the item's `photo` field (see §7 for why not Firebase Storage)
+- [ ] Review the rules changes in Jaime's pickups pull request.
+
+**Others wait on you for:** the `status`, `brand` and color list (Evan, early week 3).
+**You wait on:** nothing.
+
+### Braden: design, locations, map & time counter
+
+**Owns:**
+- **`index.html`:** the `#home` section, the header/nav, and the new `#map` section
+- **`script.js`:** the sections "PAGE NAVIGATION" and "UPDATE HOME PAGE STATISTICS"
+- `styles.css` (shared with Trevor)
+- New files `public/js/locations.js`, `public/js/time.js`, `public/js/map.js`
+
+**Week 3–4**
 - [ ] (human) Find the real lost & found desks: which buildings run one, their hours, and how long they keep items. Start with the Manwaring Center information desk. Write them in `docs/locations.md`.
-- [ ] `style.css`: colors, fonts, buttons, forms and cards, readable on phones.
-- [ ] `nav.js`: adds the same header (links: Search, Map, My requests, Admin, Log in/out) and footer to every page.
-- [ ] Create **every page file** from §4 with the header, footer and a "Coming soon" message, so nobody else has to create pages later.
+- [ ] **Early week 3, Evan and Trevor need it:** `js/locations.js`.
+  - It's a list of the desks: name, latitude/longitude, hours, and `holdDays` (how long items are kept).
+  - Replace the made-up "Library / Student Union / Science Building / Gym / Business Building" options in all 3 location dropdowns with the real ones.
+- [ ] **Early week 3, Evan needs it:** `js/time.js`, with two helpers.
+  - `timeInLostAndFound(foundAt)` returns text like `"3 days"`.
+  - `daysLeft(foundAt, holdDays)` returns a number.
+- [ ] Map page:
+  - add a **Map** nav button and a `#map` section
+  - use Leaflet + OpenStreetMap, loaded from their links
+  - each desk gets a marker showing its hours and number of items
+  - a "See items here" button opens Found Items filtered to that location
+- [ ] Mobile fix: on short screens the claim popup can't scroll, so its **Submit Claim** button is out of reach. Add `overflow-y: auto` to `.modal` in `styles.css`.
+- [ ] Check every section at phone width (375 px).
+- [ ] When this is done, help Jaime with WS4.
 
-**Weeks 2–4 (WS3)**
-- [ ] **Early week 2, Evan needs it:** `time.js` with two helpers.
-  - `timeInLostAndFound(foundAt)` returns text like "3 days".
-  - `daysLeft(foundAt, holdDays)` returns a number, e.g. for "27 days left before donation".
-- [ ] Map page (`map.html`, using Leaflet)
-  - a marker for each location, showing its hours and number of items
-  - a "See items here" link to `index.html?location=…`
-  - a list of the locations under the map
-- [ ] Admin locations page, admins only: add, edit and remove locations. Clicking the map fills in the latitude and longitude.
-- [ ] When WS3 is done, help Jaime with WS4.
+**Others wait on you for:** `locations.js` and `time.js` (Evan, Trevor, early week 3).
+**You wait on:** nothing.
 
-**Others wait on you for:**
-- page files + header (everyone, week 1)
-- `time.js` (Evan, early week 2)
-
-**You wait on:** Evan's setup.
-
-### Jaime: coordinator + login + WS4 Requests & pickups
+### Jaime: coordination, login, claims & pickups
 
 **Owns:**
-- GitHub repo settings (Jaime owns the repo), the Firebase project settings, this plan, `docs/DATA.md`
-- Login: `public/login.html`, `public/js/login.js`, `public/js/auth.js`
-- WS4:
-  - `public/request.html` + `public/js/request.js`
-  - `public/my-requests.html` + `public/js/my-requests.js`
-  - `public/admin-requests.html` + `public/js/admin-requests.js`
-  - `public/pickups.html` + `public/js/pickups.js`
+- GitHub repo settings, Firebase project settings, this plan, `docs/DATA.md`
+- **`index.html`:** the employee login and the "Claims to Review" panel inside `#admin`, plus the claim popup (`#claimModal`)
+- **`script.js`:** the sections "FIREBASE", "HELPERS", "LOAD DATA FROM FIREBASE", "CLAIM MODAL", "SUBMIT CLAIM", "DISPLAY CLAIMS FOR EMPLOYEES", "EMPLOYEE LOG IN / LOG OUT", "INITIAL PAGE LOAD"
+- `public/js/firebase.js`
+- New file `public/js/pickups.js`
 
-**Week 1**
+**Done**
 - [x] Push `MASTER_PLAN.md` to GitHub.
-- [ ] (human) **Today, everyone is waiting on this:** set up Firebase.
-  - Create the Firebase project on the free **Spark** plan; no credit card.
-  - Turn on **Authentication** (Email/Password) and **Firestore**.
-  - Add Evan, Trevor and Braden in Project settings → Users and permissions.
-- [ ] (human) Make sure all 4 have write access on GitHub. Protect `main`: require a pull request with 1 approval.
-- [ ] (human) Share this simpler plan with the team, and get a 👍 from everyone.
-- [ ] Write `docs/DATA.md`: every collection from §2, its fields, and who can read and write it. Trevor turns this into the security rules.
-- [ ] Login page (`login.html`)
-  - sign up and log in with email and password
-  - on sign-up, create the `users/{uid}` document with role `user`
-- [ ] `auth.js`: small helpers every page can use.
-  - `getCurrentUser()` and `isAdmin()`
-  - `requireLogin()` and `requireAdmin()`, which send people to `login.html` if needed
-- [ ] Write in `README.md` how to make someone an admin: in the Firebase console, set `role` to `admin` on their `users` document.
+- [x] (human) Create the Firebase project (free Spark plan) with Authentication and Firestore, and add the team.
+- [x] Connect the site to the database (pull request #2).
+- [x] Security rules, employee login, and employee-only private details (#3), then deploy.
+- [x] Write `docs/DATA.md`.
 
-**Weeks 2–4 (WS4)**
-- [ ] Request page (`request.html?item=…`), logged in only
-  - a "Describe the item" box
-  - a "This is for a friend" checkbox that shows the friend's name and contact fields
-  - saves a `requests` document with status `pending`
-- [ ] My requests page: the user's requests with their status; pending ones can be cancelled.
-- [ ] Admin requests page
-  - pending requests, each next to its item, with **Approve** / **Reject** and an optional note
-  - **Record pickup** on an approved request: who picked it up and the last 4 of their ID
-  - recording a pickup marks the item `picked_up` and saves a `pickups` document
-- [ ] Pickup log page, admins only: every pickup, newest first.
+**Week 3–4**
+- [ ] (human) Create an employee account for each teammate: Authentication → Add user, plus a `users/{uid}` document with `role: "admin"` (steps in `docs/DATA.md`).
+- [ ] (human) Protect `main` on GitHub (Settings → Branches): require a pull request with 1 approval.
+- [ ] (human) Share this updated plan with the team and get a 👍 from everyone.
+- [ ] Claim popup: a "This is for a friend" checkbox that shows the friend's name and contact fields. Update `docs/DATA.md` and `firestore.rules` for the new fields.
+- [ ] Claims to Review: **Approve** / **Reject** buttons with an optional note.
+- [ ] **Record pickup** on an approved claim:
+  - ask who is picking it up and the last 4 characters of their ID
+  - save a `pickups` document, set the item's `status` to `picked_up`, and set the claim to `"Picked up"`, all in one batch
+- [ ] Pickup log panel for employees: every pickup, newest first.
+- [ ] Rules for `pickups` and the claim updates (Trevor reviews).
 
-**Others wait on you for:**
-- the Firebase project (everyone, today)
-- `auth.js` (Trevor and Braden's admin pages, end of week 1)
-
-**You wait on:** Evan's setup, Braden's page files, Trevor's rules and sample data.
+**Others wait on you for:** `status: "picked_up"` (Evan hides those items).
+**You wait on:** Trevor's `status` field.
 
 ---
 
@@ -215,20 +233,23 @@ who took an item home. This app:
 - helps people find lost items quickly
 - helps stop theft from the lost & found by recording who picks each item up
 
-## Features (first version)
+## Features
 
-| # | Feature | Owner |
-|---|---|---|
-| 1 | Search and filter by type, color, brand and location | WS1 (Evan) |
-| 2 | Admins can add and remove items | WS2 (Trevor) |
-| 3 | Time counter: how long an item has been in the lost & found, and days left before it's donated | WS3 (Braden) |
-| 4 | Map of lost & found locations | WS3 (Braden) |
-| 5 | Request an item for a friend | WS4 (Jaime) |
-| 6 | Record of who picked the item up | WS4 (Jaime) |
-| 7 | Post a picture of each item | WS2 (Trevor) |
+| # | Feature (from our submission) | Owner | Status |
+|---|---|---|---|
+| 1 | Search and filter by type, color, brand and location | Evan | 🟡 Text, category and location work; color, brand and sort to do |
+| 2 | Employees can add and remove items | Trevor | 🟡 Adding works; edit/remove/donate to do |
+| 3 | Time counter: how long an item has been there, and days left before it's donated | Braden (helpers) + Evan (cards) | 🔴 To do |
+| 4 | Map of lost & found locations | Braden | 🔴 To do |
+| 5 | Request an item for a friend | Jaime | 🔴 To do (claims work, the friend option doesn't exist yet) |
+| 6 | Record of who picked the item up | Jaime | 🔴 To do |
+| 7 | Post a picture of each item | Trevor | 🔴 To do |
+| + | Lost reports (students describe what they lost) | Evan | ✅ Done |
+| + | Private details only employees see, shown next to claims | Jaime | ✅ Done |
 
-**Theft control:** anyone requesting an item has to describe it, and staff check the description.
-Each pickup records the person's name, the last 4 characters of their ID, and which admin released it.
+**Theft control:** claimants describe the item, and employees compare that with private details
+the public never sees. Each pickup will record the person's name, the last 4 characters of their
+ID, and which employee released it.
 
 ---
 
@@ -238,100 +259,107 @@ Everything here is free, with no credit card (Firebase **Spark** plan).
 
 | Part | What we use |
 |---|---|
-| Pages | **HTML** |
-| Look | **CSS**, in one shared `style.css` |
-| Behavior | **JavaScript**, plain, no frameworks |
-| Database | **Firebase Firestore** |
-| Login | **Firebase Authentication** (email + password) |
-| Going live | **Firebase Hosting**, deployed with the Firebase CLI (`firebase deploy`) |
+| Page | **HTML**: one page, `public/index.html`, with sections the nav shows and hides |
+| Look | **CSS**: `public/styles.css` |
+| Behavior | **JavaScript**: plain, loaded as a module (`<script type="module">`) so files can import each other |
+| Database | **Firebase Firestore**, protected by `firestore.rules` |
+| Login | **Firebase Authentication** (email + password), for employees only |
+| Going live | **Firebase Hosting**, deployed with `firebase deploy` |
 | Map | **Leaflet + OpenStreetMap**, loaded from a link; no API key |
 | Photos | Shrunk in the browser and saved in Firestore (see §7 for why not Firebase Storage) |
 | Tools | **VS Code** + the **Live Server** extension, **Git + GitHub** |
 
-Firebase is loaded in each page from Firebase's own links (the "CDN" setup in their docs), so there's
-nothing to build or install for the website itself.
+Firebase is loaded from Firebase's own links in `public/js/firebase.js`. Every file imports
+Firebase functions from there, so all files use the same version.
 
-## 2. Data model (Firestore collections)
+## 2. Data
 
-| Collection | Fields | Who can read / write |
-|---|---|---|
-| `users/{uid}` | name, email, role (`user` or `admin`) | read: that user and admins · created at sign-up with role `user` · only changed in the console |
-| `locations` | name, building, address, lat, lng, hours, holdDays | read: everyone · write: admins |
-| `items` | title, type, color, brand, description, foundWhere, foundAt, locationId, locationName, status, photo | read: everyone · write: admins |
-| `requests` | itemId, itemTitle, userId, userName, userEmail, forFriend, friendName, friendContact, message, status, adminNote, createdAt | create: logged-in users (their own) · read: owner and admins · update: admins · cancel: owner, while pending |
-| `pickups` | itemId, itemTitle, requestId, pickedUpByName, idLast4, releasedBy, pickedUpAt | admins only |
+Full details, with every field and who can read or write it, are in
+**[`docs/DATA.md`](docs/DATA.md)**. In short:
 
-- **Item status:** `available → picked_up`, or `disposed` when donated after the hold period.
-- **Request status:** `pending → approved → picked_up`, or `rejected`. The user can cancel while it's `pending`.
-- `locationName` and `itemTitle` are copied into items and requests so pages don't need extra lookups.
+| Collection | What | Read | Write |
+|---|---|---|---|
+| `items` | found items (public part) | everyone | employees |
+| `itemSecrets` | private details of each item | employees | employees |
+| `lostReports` | "Report Lost Item" form | employees | anyone can send one |
+| `claims` | "This Might Be Mine" popup | employees | anyone can send one |
+| `pickups` *(planned)* | who took an item home | employees | employees |
+| `users` | employee list | own entry only | Firebase console only |
+
+- **Item status** *(planned)*: `available` → `picked_up`, or `donated` after the hold period.
+- **Claim status:** `Pending` → `Approved` → `Picked up`, or `Rejected`.
 
 ## 3. Workstreams
 
-| Workstream | Pages |
+| Workstream | What |
 |---|---|
-| **WS1 Search & item page** (Evan) | Search page with filters, result cards with photo and time counter, item page with a "Request this item" button |
-| **WS2 Admin items & photos** (Trevor) | Admin page to add, edit, remove and donate items, with a photo |
-| **WS3 Locations, map & time counter** (Braden) | Map with a marker per desk, admin locations page, time counter helpers |
-| **WS4 Requests & pickups** (Jaime) | Login, request form (for yourself or a friend), my requests, admin review + record pickup, pickup log |
+| **WS1 Search & cards** (Evan) | Filters, sort, item cards with time counter and photo, lost reports |
+| **WS2 Employee item tools** (Trevor) | Record/edit/remove/donate items, photos, security rules |
+| **WS3 Locations, map & time** (Braden) | Real locations list, map section, time helpers, design and mobile |
+| **WS4 Claims & pickups** (Jaime) | Claim popup (incl. for a friend), approve/reject, record pickup, pickup log |
 
 WS4 has the most work, so Braden joins Jaime once WS3 is done.
 
 ## 4. Files and who owns them
 
 ```
-public/                     ← the website (what Firebase Hosting serves)
-  index.html  js/search.js           Search (home page)       Evan
-  item.html   js/item.js             Item details             Evan
-  admin-items.html  js/admin-items.js   Add/edit/remove items  Trevor
-  seed.html   js/seed.js             Add sample data (admin)  Trevor
-  map.html    js/map.js              Map of locations         Braden
-  admin-locations.html  js/admin-locations.js  Manage locations  Braden
-  login.html  js/login.js            Log in / sign up         Jaime
-  request.html  js/request.js        Request an item          Jaime
-  my-requests.html  js/my-requests.js   My requests           Jaime
-  admin-requests.html  js/admin-requests.js  Review + pickups Jaime
-  pickups.html  js/pickups.js        Pickup log               Jaime
-  css/style.css                      Shared styles            Braden (shared)
-  js/firebase.js                     Firebase setup           Evan   (shared)
-  js/auth.js                         Login helpers            Jaime  (shared)
-  js/nav.js                          Header + footer          Braden (shared)
-  js/time.js                         Time counter helpers     Braden (shared)
-firestore.rules                      Database security rules  Trevor (shared)
-firebase.json, .firebaserc           Firebase settings        Evan   (shared)
-docs/DATA.md                         Collections and fields   Jaime  (shared)
+public/
+  index.html        one page; each section has an owner (see §R)
+    #home, header/nav, #map (new)       Braden
+    #browse (Found Items), #lost        Evan
+    #admin: Record Found Item           Trevor
+    #admin: login, Claims to Review     Jaime
+    #admin: Recent Lost Reports         Evan
+    #claimModal (claim popup)           Jaime
+  script.js         main code; each "// ====" section has an owner (see §R)
+  styles.css        shared: Braden + Trevor
+  js/firebase.js    Firebase setup                         Jaime  (shared)
+  js/locations.js   list of lost & found desks (new)       Braden (shared)
+  js/time.js        time counter helpers (new)             Braden (shared)
+  js/map.js         map section (new)                      Braden
+  js/search.js      search helpers (new, if needed)        Evan
+  js/admin-items.js employee item tools (new)              Trevor
+  js/pickups.js     claims review + pickups (new)          Jaime
+firestore.rules     database security rules                Trevor (shared)
+firebase.json, .firebaserc  Firebase settings              Evan   (shared)
+docs/DATA.md        collections and fields                 Jaime  (shared)
+MASTER_PLAN.md      this plan                              Jaime
 ```
 
 **Working in parallel without collisions:**
-1. **One page = one owner.** Each page has its own HTML and JS file, so people rarely edit the same file.
-2. **Shared files** (marked "shared" above) need a heads-up in team chat and a review from another teammate.
-3. **Link to each other's pages** instead of copying code, e.g. the item page links to `request.html?item=…`.
-4. **Data changes go in `docs/DATA.md` first**, then Trevor updates `firestore.rules`.
+1. **New code goes in your own file in `public/js/`.** `script.js` imports it with one line, e.g. `import { timeInLostAndFound } from "./js/time.js";`.
+2. **In shared files, only touch your own sections.** Shared files are `index.html`, `script.js`, `styles.css`, and anything marked "shared". Tell the team before changing anyone else's.
+3. **Data changes go in `docs/DATA.md` first,** then in `firestore.rules`, in the same pull request.
+4. **Pull often** (`git pull` on `main`) so your branch doesn't drift far from everyone else's.
 
 ## 5. Timeline
 
 Assumes a final demo the week of Nov 30, 2026. Adjust the dates to the course calendar.
 
-| Week | Dates | Goal | Done when |
+| Week | Dates | Goal | Status |
 |---|---|---|---|
-| 1 | Sep 28 – Oct 2 | Setup (see §R): Firebase project, folder setup, first live page, rules, sample data, style, login | The site is live and everyone can log in on it |
-| 2–4 | Oct 5–23 | Features, all four workstreams at once | Each page works with the sample data |
-| 5 | Oct 26 | **Full-flow check:** admin adds an item with a photo → student finds it → requests it for a friend → admin approves → friend picks it up → it shows in the pickup log | The full flow works on the live site |
-| 6 | Nov 2 | Make it solid: phone layout, loading/empty/error messages, real location data | Known bugs listed and being worked |
+| 1–2 | Sep 28 – Oct 9 | Setup: Firebase, live site, first front end | ✅ Done |
+| 3 | Oct 12–16 | Database connection, security rules, employee login (done). Start features: `locations.js`, `time.js`, `status`, `brand`, color list | 👉 **We are here** |
+| 4 | Oct 19–23 | Features: filters, sort, time counter on cards, edit/remove, photos, map, for-a-friend, approve/reject, pickups | |
+| 5 | Oct 26 | **Full-flow check:** employee adds an item with a photo → student finds it → requests it for a friend → employee approves → friend picks it up → it shows in the pickup log and disappears from search | |
+| 6 | Nov 2 | Make it solid: phone layout, loading/empty/error messages, real location data | |
 | 7 | Nov 9 | One optional extra per person (§8) | |
-| 8 | Nov 16 | Test with 3–5 real students on the live site | Feedback written down |
+| 8 | Nov 16 | Test with 3–5 real students on the live site | |
 | 9 | Nov 23 | Fix the top feedback (short week, Thanksgiving) | |
-| 10 | Nov 30 | No new features 48 hours before the demo; rehearse it | Final demo |
+| 10 | Nov 30 | No new features 48 hours before the demo; rehearse it | |
 
 **Weekly routine:** short written check-ins Mon/Wed/Fri (done / next / blocked), one 30-minute
 call a week to try the live site together, and pull request reviews within 24 hours.
 
 ## 6. Git workflow
 
-- Before starting a task, run `git pull` on `main`, then make a branch, e.g. `evan/search-filters`
-  or `braden/map-page`.
+- Before starting a task, run `git pull` on `main`, then make a branch, e.g. `evan/color-filter`
+  or `braden/map`.
 - Commit small steps with clear messages ("Add color filter").
-- Open a pull request. One teammate reviews it before it merges into `main`.
-- **Deploy only from an up-to-date `main`:** run `git pull`, then `firebase deploy`.
+- Open a pull request. One teammate reviews it before it merges into `main`. Nobody pushes to
+  `main` directly.
+- **Deploy only from an up-to-date `main`,** after the merge: run `git pull`, then `firebase deploy`.
+  This deploys the website **and** the security rules together.
 
 **A task is done when:**
 - it works on a computer and on a phone
@@ -346,18 +374,20 @@ call a week to try the live site together, and pull request reviews within 24 ho
 
 | Risk | What to do about it |
 |---|---|
-| Photo storage (Firebase Storage) requires the paid Blaze plan since Feb 3, 2026, which needs a credit card | Shrink each photo in the browser (about 400 px wide, JPEG) and save it in the item's Firestore document; that's free. Upgrading later is an optional extra (§8). |
-| Anyone can open the browser console and try to change data | `firestore.rules`: only admins can change items, locations and pickups, and nobody can make themselves admin |
-| Free-plan limits (e.g. 50,000 database reads per day) | Plenty for a class. Load the list once and filter in JavaScript; don't reload on every keystroke. |
-| The Firebase web config is visible in the repo | That's normal for Firebase websites; the security rules protect the data. Never commit private keys or service-account files. |
-| Privacy of pickup records | Admins only. Store only the last 4 characters of an ID. |
-| Wrong location data | Braden confirms with each building in weeks 1–2 |
+| Everyone edits the same `script.js` / `index.html` | Put new code in your own `js/` file; only touch your own sections; pull often |
+| Live Server uses the real, shared database | Use obviously fake test data and delete it afterwards |
+| A new field or collection isn't in the rules | Firebase rejects the save. Add it to `docs/DATA.md` and `firestore.rules` in the same pull request. |
+| Photo storage (Firebase Storage) requires the paid Blaze plan since Feb 3, 2026, which needs a credit card | Shrink each photo to about 400 px wide and save it in the item's document; that's free. Upgrading later is an optional extra. |
+| The Firebase web config (API key) is visible in the code | That's normal for Firebase websites; the security rules protect the data. Never commit private keys or service-account files. |
+| Someone claims an item from its public description | Employees compare the claim with the private details; pickups record the name and last 4 of their ID |
+| Privacy of student emails and pickup records | Employees only (enforced by the rules). Store only the last 4 characters of an ID. |
+| Wrong location data | Braden confirms with each building in week 3 |
 | Uneven workload | Braden helps Jaime after WS3 is done |
 
 ## 8. Optional extras (week 7+)
 
-- **Evan:** keep the filters in the page address so searches can be shared; "similar colors" (navy ≈ blue)
-- **Trevor:** hidden details only staff can see (serial number, name inside), kept in an admin-only collection and checked against requests; a "donate all expired items" button
-- **Braden:** "open now" badge on each location; a walking-directions link
-- **Jaime:** a badge showing how many requests are waiting for review
+- **Evan:** keep the filters in the page address so searches can be shared; show employees possible matches between lost reports and found items
+- **Trevor:** a "donate all expired items" button
+- **Braden:** "open now" badge on each location; a walking-directions link; an employee page to edit locations
+- **Jaime:** a badge showing how many claims are waiting for review; Firebase App Check
 - **Team:** more and bigger photos with Firebase Storage (needs the Blaze plan with a card; set a $1 budget alert first)
