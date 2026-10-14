@@ -138,7 +138,11 @@ function formatDate(timestamp) {
         return "Today";
     }
 
-    return timestamp.toDate().toLocaleDateString("en-US", {
+    const date = typeof timestamp.toDate === "function"
+        ? timestamp.toDate()
+        : new Date(timestamp);
+
+    return date.toLocaleDateString("en-US", {
         month: "long",
         day: "numeric"
     });
@@ -186,7 +190,18 @@ async function loadCollection(collectionName, dateField) {
 
 async function loadFoundItems() {
 
-    foundItems = await loadCollection("items", "foundAt");
+    foundItems = (await loadCollection("items", "foundAt")).map(function(item) {
+        // The current data model uses title/type/locationName. These aliases
+        // keep the older homepage compatible while the team migrates pages.
+        return {
+            ...item,
+            name: item.name || item.title || "Untitled item",
+            category: item.category || item.type || "Other",
+            location: item.location || item.locationName || item.foundWhere || "Unknown",
+            description: item.description || "",
+            color: item.color || ""
+        };
+    });
 
     filterItems();
 
@@ -1196,7 +1211,11 @@ function updateStats() {
 
     const foundThisWeek =
         foundItems.filter(function(item) {
-            return item.foundAt && item.foundAt.toMillis() >= oneWeekAgo;
+            if (!item.foundAt) return false;
+            const foundTime = typeof item.foundAt.toMillis === "function"
+                ? item.foundAt.toMillis()
+                : new Date(item.foundAt).getTime();
+            return foundTime >= oneWeekAgo;
         });
 
     document.getElementById(
