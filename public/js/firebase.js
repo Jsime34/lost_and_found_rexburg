@@ -48,6 +48,7 @@ export {
   orderBy,
   serverTimestamp,
   Timestamp,
+  writeBatch,
 } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-firestore.js";
 
 export {
