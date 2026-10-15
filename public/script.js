@@ -138,14 +138,56 @@ function formatDate(timestamp) {
         return "Today";
     }
 
+    // Firestore timestamps have toDate(); older/manual test records may have
+    // a normal Date or a date string instead.
     const date = typeof timestamp.toDate === "function"
         ? timestamp.toDate()
         : new Date(timestamp);
+
+    if (Number.isNaN(date.getTime())) {
+        return "Date unknown";
+    }
 
     return date.toLocaleDateString("en-US", {
         month: "long",
         day: "numeric"
     });
+}
+
+
+function dateToMillis(value) {
+
+    if (!value) {
+        return 0;
+    }
+
+    if (typeof value.toMillis === "function") {
+        return value.toMillis();
+    }
+
+    if (typeof value.toDate === "function") {
+        return value.toDate().getTime();
+    }
+
+    const millis = new Date(value).getTime();
+    return Number.isNaN(millis) ? 0 : millis;
+}
+
+
+// Keep the public page working if an older item uses a slightly different
+// field name. The current app uses name/category/location; the planned version
+// used title/type/locationName/foundWhere.
+function normalizeItem(item) {
+
+    return {
+        ...item,
+        name: item.name || item.title || "Unnamed item",
+        category: item.category || item.type || "Other",
+        color: item.color || "Unknown",
+        location: item.location || item.locationName || item.foundWhere || "Unknown",
+        description: item.description || "No description provided.",
+        icon: item.icon || "📦"
+    };
 }
 
 
@@ -190,18 +232,14 @@ async function loadCollection(collectionName, dateField) {
 
 async function loadFoundItems() {
 
-    foundItems = (await loadCollection("items", "foundAt")).map(function(item) {
-        // The current data model uses title/type/locationName. These aliases
-        // keep the older homepage compatible while the team migrates pages.
-        return {
-            ...item,
-            name: item.name || item.title || "Untitled item",
-            category: item.category || item.type || "Other",
-            location: item.location || item.locationName || item.foundWhere || "Unknown",
-            description: item.description || "",
-            color: item.color || ""
-        };
-    });
+    // Load without orderBy so records missing foundAt do not disappear from
+    // the query. Sort locally and normalize records added by older versions
+    // of the project.
+    foundItems = (await loadCollection("items"))
+        .map(normalizeItem)
+        .sort(function(first, second) {
+            return dateToMillis(second.foundAt) - dateToMillis(first.foundAt);
+        });
 
     filterItems();
 
@@ -1211,11 +1249,7 @@ function updateStats() {
 
     const foundThisWeek =
         foundItems.filter(function(item) {
-            if (!item.foundAt) return false;
-            const foundTime = typeof item.foundAt.toMillis === "function"
-                ? item.foundAt.toMillis()
-                : new Date(item.foundAt).getTime();
-            return foundTime >= oneWeekAgo;
+            return dateToMillis(item.foundAt) >= oneWeekAgo;
         });
 
     document.getElementById(
