@@ -122,7 +122,7 @@ If you are an AI agent working for one of the team members:
   - Live Server uses the real database
   - deploy only from `main` with `firebase deploy`
 - [x] (human) Firebase console → Authentication → Settings → Authorized domains: add `127.0.0.1`, so employee login works with Live Server.
-- [ ] Color filter: a dropdown next to Category, using the same color list as Trevor's form.
+- [x] Color filter: a dropdown next to Category, using the same color list as Trevor's form.
 - [ ] Search also matches `brand` (after Trevor adds it), and the card shows the brand.
 - [ ] Sort: "Newest first" / "Oldest first" dropdown.
 - [ ] Cards show "In lost & found for 3 days · 27 days left" using Braden's `time.js`.
