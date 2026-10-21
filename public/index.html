@@ -100,6 +100,11 @@
 
             <div id="recentItems" class="item-grid"></div>
 
+        </section>
+        <!-- END HOME PAGE. Every page <section> must be closed before the next
+             one starts, or the nav buttons will hide the whole site. -->
+
+
         <!-- =========================
              BROWSE FOUND ITEMS
         ========================== -->
@@ -595,7 +600,9 @@
 
 
     <!-- type="module" lets script.js import from js/firebase.js -->
-    <script type="module" src="script.js?v=7bc656f"></script>
+    <!-- No "?v=..." needed: firebase.json tells browsers to always check for
+         the newest version of our files. -->
+    <script type="module" src="script.js"></script>
 
 </body>
 </html>
