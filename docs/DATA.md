@@ -9,6 +9,8 @@ its fields, and who can read or change it. The rules that enforce this are in
 
 **Who is who:**
 - **Visitor:** anyone using the website. No login needed.
+- **Student:** someone signed in with **Google** (the "Sign in with Google" button in the header).
+  Needed to send a claim; they can see their own claims under **My Requests**.
 - **Employee:** someone who logged in on the Employees page **and** has a `users/{uid}` document
   with `role: "admin"`. Employee accounts are only created by hand in the Firebase console.
 
@@ -66,7 +68,9 @@ Same document id as the item in `items`. Saved together with the item in one bat
 |---|---|---|
 | `itemId` | text | id of an item that exists |
 | `itemName` | text | copied from the item, max 100 |
-| `email` | text | max 200 |
+| `userId` | text | the signed-in student's account id; must match their account |
+| `userName` | text | their Google name (or email), max 100 |
+| `email` | text | their Google account's email; must match their account, max 200 |
 | `verification` | text | what the student says proves it's theirs, max 2000 |
 | `status` | text | `"Pending"` when created. Later *(planned, Jaime)*: `"Approved"`, `"Rejected"`, `"Picked up"` |
 | `createdAt` | timestamp | must be `serverTimestamp()` |
@@ -75,7 +79,12 @@ Same document id as the item in `items`. Saved together with the item in one bat
 | `friendContact` | text | *(planned, Jaime)* optional |
 | `adminNote` | text | *(planned, Jaime)* note from the employee who approved/rejected |
 
-**Create:** anyone (exactly these fields, status `"Pending"`) · **Read / change / delete:** employees only.
+**Create:** signed-in students, in their own name only (exactly the fields above that aren't
+*planned*, with status `"Pending"`) · **Read:** the student who sent it, and employees ·
+**Change / delete:** employees only (students can't approve their own claim).
+
+My Requests loads a student's claims with `where("userId", "==", their uid)`; the rules reject
+any query that could return someone else's claims.
 
 ## `pickups` *(planned, Jaime)*: who took an item home
 

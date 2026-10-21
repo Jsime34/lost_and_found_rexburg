@@ -5,6 +5,8 @@ rules_version = '2';
 //
 // Who is who:
 //   - Visitor:  anyone using the website (not logged in).
+//   - Student:  someone signed in with Google (header button). Can send claims
+//               and read their own claims.
 //   - Employee: someone who logged in on the Employees page AND has a document
 //               users/{their uid} with role "admin". Those documents are only
 //               created by hand in the Firebase console.
@@ -46,15 +48,21 @@ service cloud.firestore {
         && report.createdAt == request.time;
     }
 
-    // A claim sent from the "This Might Be Mine" popup.
+    // A claim sent from the "This Might Be Mine" popup by a signed-in student.
+    // userId and email must be the signed-in account's own, so nobody can
+    // send a claim in someone else's name.
     function isValidClaim() {
       let claim = request.resource.data;
-      let fields = ["itemId", "itemName", "email", "verification", "status", "createdAt"];
+      let fields = ["itemId", "itemName", "userId", "userName", "email",
+                    "verification", "status", "createdAt"];
 
       return claim.keys().hasOnly(fields)
         && claim.keys().hasAll(fields)
+        && claim.userId == request.auth.uid
+        && claim.email == request.auth.token.email
         && isText(claim.itemId, 100)
         && isText(claim.itemName, 100)
+        && isText(claim.userName, 100)
         && isText(claim.email, 200)
         && isText(claim.verification, 2000)
         && claim.status == "Pending"
@@ -93,9 +101,13 @@ service cloud.firestore {
     }
 
     // Claims: anyone can send one, only employees can read them.
+    // Claims: signed-in students can send one and read their own.
+    // Employees can read and change all of them.
     match /claims/{claimId} {
-      allow create: if isValidClaim();
-      allow read, update, delete: if isEmployee();
+      allow create: if request.auth != null && isValidClaim();
+      allow read: if isEmployee()
+        || (request.auth != null && resource.data.userId == request.auth.uid);
+      allow update, delete: if isEmployee();
     }
 
     // Anything not listed above is blocked.

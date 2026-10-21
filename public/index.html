@@ -23,8 +23,23 @@
             <button class="nav-btn active" data-page="home">Home</button>
             <button class="nav-btn" data-page="browse">Found Items</button>
             <button class="nav-btn" data-page="lost">Report Lost Item</button>
+            <button class="nav-btn" data-page="requests">My Requests</button>
             <button class="nav-btn" data-page="admin">Employees</button>
         </nav>
+
+        <!-- STUDENT SIGN IN (Google). script.js shows one or the other. -->
+        <div class="auth-area">
+            <button id="googleSignInBtn" type="button" class="google-btn">
+                Sign in with Google
+            </button>
+
+            <div id="signedInBox" class="signed-in-box hidden">
+                <span>Hi, <strong id="signedInName"></strong></span>
+                <button id="signOutBtn" type="button" class="sign-out-btn">
+                    Sign out
+                </button>
+            </div>
+        </div>
     </header>
 
     <main>
@@ -315,6 +330,35 @@
 
 
         <!-- =========================
+             MY REQUESTS (signed-in students)
+        ========================== -->
+        <section id="requests" class="page">
+
+            <div class="page-title">
+                <span class="eyebrow">YOUR CLAIMS</span>
+                <h2>My Requests</h2>
+                <p>
+                    Items you've claimed, and where each request stands.
+                </p>
+            </div>
+
+            <!-- Shown while nobody is signed in -->
+            <div id="requestsSignIn" class="report-card">
+                <p>
+                    Sign in with your Google account to see your requests.
+                </p>
+
+                <button id="requestsSignInBtn" type="button" class="primary-btn">
+                    Sign in with Google
+                </button>
+            </div>
+
+            <div id="myRequests" class="item-grid hidden"></div>
+
+        </section>
+
+
+        <!-- =========================
              EMPLOYEE / ADMIN PAGE
         ========================== -->
         <section id="admin" class="page">
@@ -545,26 +589,29 @@
             </p>
 
 
+            <!-- Shown when the student isn't signed in yet -->
+            <div id="claimSignIn" class="report-card hidden">
+                <p>
+                    To claim an item, sign in with your Google account.
+                    We'll use its email to contact you.
+                </p>
+
+                <button id="claimSignInBtn" type="button" class="primary-btn">
+                    Sign in with Google
+                </button>
+            </div>
+
+
             <form id="claimForm">
 
                 <input type="hidden" id="claimItemId">
 
 
-                <div class="form-group">
-
-                    <label for="claimEmail">
-                        University Email
-                    </label>
-
-                    <input
-                        id="claimEmail"
-                        maxlength="200"
-                        type="email"
-                        placeholder="student@university.edu"
-                        required
-                    >
-
-                </div>
+                <!-- The email comes from the student's Google account, so
+                     nobody can send a claim in someone else's name. -->
+                <p class="claim-as">
+                    Claiming as <strong id="claimUserEmail"></strong>
+                </p>
 
 
                 <div class="form-group">
@@ -599,6 +646,7 @@
                     <h3>Claim submitted!</h3>
                     <p>
                         A Lost & Found employee will review your information.
+                        You can check its status under <strong>My Requests</strong>.
                     </p>
                 </div>
 
