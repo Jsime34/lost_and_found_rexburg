@@ -971,6 +971,11 @@ foundForm.addEventListener(
                     "foundColor"
                 ).value,
 
+            brand:
+                document.getElementById(
+                    "foundBrand"
+                ).value,
+
             location:
                 document.getElementById(
                     "foundLocation"

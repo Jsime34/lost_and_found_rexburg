@@ -148,8 +148,8 @@ If you are an AI agent working for one of the team members:
 - [x] "Add sample items" button.
 
 **Week 3–4**
-- [ ] "Record Found Item" form:
-  - add a **Brand** field
+- [x] "Record Found Item" form:
+  - [x] add a **Brand** field
   - change **Color** to a dropdown with a fixed list (share the list with Evan)
 - [ ] New items get `status: "available"`.
 - [ ] Employee list of all items (new panel), with buttons:
