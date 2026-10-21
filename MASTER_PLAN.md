@@ -117,11 +117,11 @@ If you are an AI agent working for one of the team members:
 - [x] Delete the unused `compiler.json`.
 
 **Week 3–4**
-- [ ] Add a "How to run it" section to `README.md`:
+- [x] Add a "How to run it" section to `README.md`:
   - open the folder in VS Code and use the **Live Server** extension
   - Live Server uses the real database
   - deploy only from `main` with `firebase deploy`
-- [ ] (human) Firebase console → Authentication → Settings → Authorized domains: add `127.0.0.1`, so employee login works with Live Server.
+- [x] (human) Firebase console → Authentication → Settings → Authorized domains: add `127.0.0.1`, so employee login works with Live Server.
 - [ ] Color filter: a dropdown next to Category, using the same color list as Trevor's form.
 - [ ] Search also matches `brand` (after Trevor adds it), and the card shows the brand.
 - [ ] Sort: "Newest first" / "Oldest first" dropdown.

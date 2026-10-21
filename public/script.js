@@ -561,6 +561,9 @@ const searchInput =
 const categoryFilter =
     document.getElementById("categoryFilter");
 
+const colorFilter =
+    document.getElementById("colorFilter");
+
 const locationFilter =
     document.getElementById("locationFilter");
 
@@ -572,6 +575,9 @@ function filterItems() {
 
     const category =
         categoryFilter.value;
+
+    const color =
+        colorFilter.value;
 
     const location =
         locationFilter.value;
@@ -589,6 +595,10 @@ function filterItems() {
                 category === "all" ||
                 item.category === category;
 
+            const matchesColor =
+                color === "all" ||
+                item.color === color;
+
             const matchesLocation =
                 location === "all" ||
                 item.location === location;
@@ -597,6 +607,7 @@ function filterItems() {
             return (
                 matchesSearch &&
                 matchesCategory &&
+                matchesColor &&
                 matchesLocation
             );
 
@@ -622,6 +633,11 @@ categoryFilter.addEventListener(
 );
 
 locationFilter.addEventListener(
+    "change",
+    filterItems
+);
+
+colorFilter.addEventListener(
     "change",
     filterItems
 );
