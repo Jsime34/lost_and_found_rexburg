@@ -179,14 +179,16 @@ function dateToMillis(value) {
 // used title/type/locationName/foundWhere.
 function normalizeItem(item) {
 
+    // String(...) makes sure each field is text, so one odd item (for example
+    // a number typed in the Firebase console) can't crash the search for everyone.
     return {
         ...item,
-        name: item.name || item.title || "Unnamed item",
-        category: item.category || item.type || "Other",
-        color: item.color || "Unknown",
-        location: item.location || item.locationName || item.foundWhere || "Unknown",
-        description: item.description || "No description provided.",
-        icon: item.icon || "📦"
+        name: String(item.name || item.title || "Unnamed item"),
+        category: String(item.category || item.type || "Other"),
+        color: String(item.color || "Unknown"),
+        location: String(item.location || item.locationName || item.foundWhere || "Unknown"),
+        description: String(item.description || "No description provided."),
+        icon: String(item.icon || "📦")
     };
 }
 
