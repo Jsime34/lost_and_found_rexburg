@@ -7,7 +7,8 @@
 //
 // Who can read what is decided by the security rules in firestore.rules:
 //   - everyone can see found items (but not their private details)
-//   - only logged-in employees can see private details, lost reports and claims
+//   - signed-in students can send claims and see their own claims
+//   - only logged-in employees can see private details, lost reports and all claims
 import {
     db,
     auth,
@@ -17,13 +18,16 @@ import {
     getDocs,
     addDoc,
     query,
+    where,
     orderBy,
     serverTimestamp,
     Timestamp,
     writeBatch,
     onAuthStateChanged,
     signInWithEmailAndPassword,
-    signOut
+    signOut,
+    GoogleAuthProvider,
+    signInWithPopup
 } from "./js/firebase.js";
 
 
@@ -34,6 +38,12 @@ let foundItems = [];
 let lostReports = [];
 let claims = [];
 let itemSecrets = {};   // private details of each found item, by item id
+
+// The signed-in account (a student with Google, or an employee), or null.
+let currentUser = null;
+
+// The signed-in student's own claims. Filled in by loadMyRequests().
+let myClaims = [];
 
 // The logged-in employee ({ name, email }), or null for visitors.
 let currentEmployee = null;
@@ -658,6 +668,38 @@ const closeModal =
 const claimForm =
     document.getElementById("claimForm");
 
+const claimSignIn =
+    document.getElementById("claimSignIn");
+
+
+// Students must be signed in (with Google) to claim an item.
+// Shows the "Sign in with Google" box or the claim form.
+function updateClaimModal() {
+
+    if (currentUser) {
+
+        document.getElementById("claimUserEmail").textContent =
+            currentUser.email;
+
+        claimSignIn.classList.add("hidden");
+        claimForm.classList.remove("hidden");
+
+    } else {
+
+        claimSignIn.classList.remove("hidden");
+        claimForm.classList.add("hidden");
+    }
+}
+
+
+document.getElementById("claimSignInBtn").addEventListener(
+    "click",
+    function() {
+        signInWithGoogle();
+        // onAuthStateChanged (at the bottom) swaps in the claim form.
+    }
+);
+
 
 function addClaimButtonEvents() {
 
@@ -694,11 +736,12 @@ function addClaimButtonEvents() {
                     "Claim: " + item.name;
 
 
-                claimForm.classList.remove("hidden");
-
                 document.getElementById(
                     "claimSuccess"
                 ).classList.add("hidden");
+
+                // Sign-in box or claim form, depending on who's signed in.
+                updateClaimModal();
 
 
                 claimModal.classList.remove("hidden");
@@ -742,6 +785,13 @@ claimForm.addEventListener(
         event.preventDefault();
 
 
+        // Signed out while the popup was open? Show the sign-in box again.
+        if (!currentUser) {
+            updateClaimModal();
+            return;
+        }
+
+
         const itemId =
             document.getElementById(
                 "claimItemId"
@@ -759,12 +809,15 @@ claimForm.addEventListener(
 
             itemId: itemId,
 
-            itemName: item.name,
+            itemName: item.name.slice(0, 100),
 
-            email:
-                document.getElementById(
-                    "claimEmail"
-                ).value,
+            // Who sent it. The security rules check these match the
+            // signed-in account, so nobody can claim in someone else's name.
+            userId: currentUser.uid,
+
+            userName: (currentUser.displayName || currentUser.email).slice(0, 100),
+
+            email: currentUser.email,
 
             verification:
                 document.getElementById(
@@ -796,7 +849,10 @@ claimForm.addEventListener(
                 "claimSuccess"
             ).classList.remove("hidden");
 
-            // Only employees are allowed to read claims.
+            // Show it in My Requests right away.
+            await loadMyRequests();
+
+            // Only employees are allowed to read everyone's claims.
             if (currentEmployee) {
                 await loadClaims();
             }
@@ -1229,7 +1285,7 @@ function displayClaims() {
 
                 <p>
                     <strong>Student:</strong>
-                    ${escapeHtml(claim.email)}
+                    ${escapeHtml(claim.userName ? claim.userName + " (" + claim.email + ")" : claim.email)}
                 </p>
 
                 <p>
@@ -1298,6 +1354,236 @@ function updateStats() {
 
 
 // ==========================================
+// STUDENT SIGN IN (GOOGLE) + MY REQUESTS
+// ==========================================
+
+// Opens Google's sign-in window. When it works, onAuthStateChanged
+// (at the bottom of this file) updates the page.
+async function signInWithGoogle() {
+
+    try {
+
+        await signInWithPopup(auth, new GoogleAuthProvider());
+
+    } catch (error) {
+
+        // The student closed the window: nothing to report.
+        if (error.code === "auth/popup-closed-by-user" ||
+            error.code === "auth/cancelled-popup-request") {
+            return;
+        }
+
+        console.error(error);
+
+        if (error.code === "auth/popup-blocked") {
+            alert("Your browser blocked the sign-in window. Allow pop-ups for this site and try again.");
+        } else if (error.code === "auth/operation-not-allowed") {
+            alert("Google sign-in isn't turned on for this site yet.");
+        } else if (error.code === "auth/unauthorized-domain") {
+            alert("This website address isn't allowed to sign in yet (Firebase console → Authentication → Settings → Authorized domains).");
+        } else {
+            alert("Sorry, sign-in didn't work. Please try again.");
+        }
+    }
+}
+
+
+document.getElementById("googleSignInBtn").addEventListener(
+    "click",
+    signInWithGoogle
+);
+
+document.getElementById("requestsSignInBtn").addEventListener(
+    "click",
+    signInWithGoogle
+);
+
+document.getElementById("signOutBtn").addEventListener(
+    "click",
+    function() {
+        signOut(auth);
+    }
+);
+
+
+// Header: "Sign in with Google" button, or "Hi, Name · Sign out".
+function updateAuthArea() {
+
+    const signInButton = document.getElementById("googleSignInBtn");
+    const signedInBox = document.getElementById("signedInBox");
+
+    if (currentUser) {
+
+        // First name: from the employee list, the Google account, or the
+        // part of the email before the @.
+        const fullName =
+            (currentEmployee && currentEmployee.name) ||
+            currentUser.displayName ||
+            currentUser.email.split("@")[0];
+
+        document.getElementById("signedInName").textContent =
+            fullName.split("@")[0].split(" ")[0];
+
+        signInButton.classList.add("hidden");
+        signedInBox.classList.remove("hidden");
+
+    } else {
+
+        signedInBox.classList.add("hidden");
+        signInButton.classList.remove("hidden");
+    }
+}
+
+
+// Loads only the signed-in student's claims. The security rules don't
+// let anyone read other people's claims.
+async function loadMyRequests() {
+
+    if (!currentUser) {
+        myClaims = [];
+        displayMyRequests();
+        return;
+    }
+
+    showMessage("myRequests", "Loading your requests...");
+
+    try {
+
+        const mine =
+            query(
+                collection(db, "claims"),
+                where("userId", "==", currentUser.uid)
+            );
+
+        const snapshot = await getDocs(mine);
+
+        if (snapshot.metadata.fromCache) {
+            throw new Error("Couldn't reach Firebase (offline).");
+        }
+
+        // Newest first. (Sorted here so Firebase doesn't need an extra index.)
+        myClaims = snapshot.docs
+            .map(function(doc) {
+                return { id: doc.id, ...doc.data() };
+            })
+            .sort(function(first, second) {
+                return dateToMillis(second.createdAt) - dateToMillis(first.createdAt);
+            });
+
+        displayMyRequests();
+
+    } catch (error) {
+
+        console.error(error);
+
+        document.getElementById("requestsSignIn").classList.add("hidden");
+        document.getElementById("myRequests").classList.remove("hidden");
+
+        showMessage(
+            "myRequests",
+            "Couldn't load your requests. Refresh the page to try again."
+        );
+    }
+}
+
+
+// A short explanation for each claim status.
+function statusMessage(status) {
+
+    if (status === "Pending") {
+        return "An employee will compare your description with the item.";
+    }
+
+    if (status === "Approved") {
+        return "Approved! Bring a photo ID to the lost & found desk to pick it up.";
+    }
+
+    if (status === "Rejected") {
+        return "This request wasn't approved. Contact the lost & found desk if you have questions.";
+    }
+
+    if (status === "Picked up") {
+        return "This item was picked up.";
+    }
+
+    return "";
+}
+
+
+function displayMyRequests() {
+
+    const signInBox = document.getElementById("requestsSignIn");
+    const list = document.getElementById("myRequests");
+
+
+    if (!currentUser) {
+
+        signInBox.classList.remove("hidden");
+        list.classList.add("hidden");
+        list.innerHTML = "";
+
+        return;
+    }
+
+
+    signInBox.classList.add("hidden");
+    list.classList.remove("hidden");
+
+
+    if (myClaims.length === 0) {
+
+        list.innerHTML = `
+            <p>
+                You haven't claimed any items yet. Find yours under
+                <strong>Found Items</strong> and press "This Might Be Mine".
+            </p>
+        `;
+
+        return;
+    }
+
+
+    list.innerHTML = "";
+
+    myClaims.forEach(function(claim) {
+
+        // e.g. "Picked up" → "status-picked-up" (colors in styles.css)
+        const statusClass =
+            "status-" + String(claim.status).toLowerCase().replace(/\s+/g, "-");
+
+        list.innerHTML += `
+
+            <div class="report-card">
+
+                <span class="status-badge ${escapeHtml(statusClass)}">
+                    ${escapeHtml(claim.status)}
+                </span>
+
+                <h4>${escapeHtml(claim.itemName)}</h4>
+
+                <p>
+                    <strong>Sent:</strong>
+                    ${escapeHtml(formatDate(claim.createdAt))}
+                </p>
+
+                <p>
+                    <strong>What you said:</strong>
+                    ${escapeHtml(claim.verification)}
+                </p>
+
+                <p class="status-note">
+                    ${escapeHtml(statusMessage(claim.status))}
+                </p>
+
+            </div>
+
+        `;
+
+    });
+}
+
+
+// ==========================================
 // EMPLOYEE LOG IN / LOG OUT
 // ==========================================
 
@@ -1322,6 +1608,26 @@ function showLoginError(message) {
 }
 
 
+// Employees have a users/{uid} document with role "admin". These are
+// only created by hand in the Firebase console.
+// Returns { name, email } for employees, or null for everyone else.
+async function getEmployeeProfile(user) {
+
+    const userDoc =
+        await getDoc(doc(db, "users", user.uid));
+
+    if (userDoc.exists() && userDoc.data().role === "admin") {
+
+        return {
+            name: userDoc.data().name || user.email,
+            email: user.email
+        };
+    }
+
+    return null;
+}
+
+
 loginForm.addEventListener(
     "submit",
     async function(event) {
@@ -1339,15 +1645,29 @@ loginForm.addEventListener(
 
         try {
 
-            await signInWithEmailAndPassword(
-                auth,
-                document.getElementById("loginEmail").value,
-                document.getElementById("loginPassword").value
-            );
+            const credential =
+                await signInWithEmailAndPassword(
+                    auth,
+                    document.getElementById("loginEmail").value,
+                    document.getElementById("loginPassword").value
+                );
 
             loginForm.reset();
 
-            // onAuthStateChanged (below) shows the dashboard.
+            // A real account, but not an employee: don't keep it signed in here.
+            const employee =
+                await getEmployeeProfile(credential.user);
+
+            if (!employee) {
+
+                showLoginError(
+                    "This account isn't on the employee list. Ask the site admin to add it."
+                );
+
+                await signOut(auth);
+            }
+
+            // For employees, onAuthStateChanged (below) shows the dashboard.
 
         } catch (error) {
 
@@ -1355,8 +1675,14 @@ loginForm.addEventListener(
 
             if (error.code === "auth/too-many-requests") {
                 showLoginError("Too many tries. Wait a few minutes and try again.");
-            } else {
+            } else if (error.code === "auth/unauthorized-domain") {
+                showLoginError("This website address isn't allowed to log in yet (Firebase console → Authentication → Settings → Authorized domains).");
+            } else if (error.code === "auth/network-request-failed") {
+                showLoginError("Couldn't reach Firebase. Check your internet connection.");
+            } else if (String(error.code).startsWith("auth/")) {
                 showLoginError("Wrong email or password.");
+            } else {
+                showLoginError("Couldn't check your account. Please try again.");
             }
 
         } finally {
@@ -1378,9 +1704,10 @@ document.getElementById("logoutBtn").addEventListener(
 
 
 // Firebase calls this when the page opens and every time someone
-// logs in or out.
+// signs in or out (students with Google, employees with email + password).
 onAuthStateChanged(auth, async function(user) {
 
+    currentUser = user;
     currentEmployee = null;
 
 
@@ -1388,41 +1715,24 @@ onAuthStateChanged(auth, async function(user) {
 
         try {
 
-            // Employees have a users/{uid} document with role "admin".
-            // These are only created by hand in the Firebase console.
-            const userDoc =
-                await getDoc(doc(db, "users", user.uid));
-
-            if (userDoc.exists() && userDoc.data().role === "admin") {
-
-                currentEmployee = {
-                    name: userDoc.data().name || user.email,
-                    email: user.email
-                };
-
-            } else {
-
-                showLoginError(
-                    "This account isn't on the employee list. Ask the site admin to add it."
-                );
-
-                await signOut(auth);
-
-                return;
-            }
+            currentEmployee = await getEmployeeProfile(user);
 
         } catch (error) {
 
+            // Couldn't check: treat them as a student for now.
             console.error(error);
-
-            showLoginError("Couldn't check your account. Please try again.");
-
-            return;
         }
 
     }
 
 
+    // Student parts of the page: header, claim popup, My Requests.
+    updateAuthArea();
+    updateClaimModal();
+    await loadMyRequests();
+
+
+    // Employee parts of the page.
     if (currentEmployee) {
 
         document.getElementById("employeeName").textContent =

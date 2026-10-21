@@ -55,7 +55,8 @@ If you are an AI agent working for one of the team members:
 - **Home page:** intro, stats (unclaimed items, found this week, places with items), recent items
 - **Found Items:** search by text, plus category and location filters
 - **Report Lost Item:** students send a lost report
-- **"This Might Be Mine":** students send a claim with their email and a description
+- **"This Might Be Mine":** students **sign in with Google** and send a claim with a description; their name and email come from their Google account
+- **My Requests:** signed-in students see their own claims and each one's status
 - **Employees page:**
   - log in (employee accounts only)
   - record a found item, with private details kept employee-only
@@ -196,8 +197,8 @@ If you are an AI agent working for one of the team members:
 
 **Owns:**
 - GitHub repo settings, Firebase project settings, this plan, `docs/DATA.md`
-- **`index.html`:** the employee login and the "Claims to Review" panel inside `#admin`, plus the claim popup (`#claimModal`)
-- **`script.js`:** the sections "FIREBASE", "HELPERS", "LOAD DATA FROM FIREBASE", "CLAIM MODAL", "SUBMIT CLAIM", "DISPLAY CLAIMS FOR EMPLOYEES", "EMPLOYEE LOG IN / LOG OUT", "INITIAL PAGE LOAD"
+- **`index.html`:** the employee login and the "Claims to Review" panel inside `#admin`, the claim popup (`#claimModal`), the `#requests` section (My Requests), and the Google sign-in area in the header (`.auth-area`)
+- **`script.js`:** the sections "FIREBASE", "HELPERS", "LOAD DATA FROM FIREBASE", "CLAIM MODAL", "SUBMIT CLAIM", "DISPLAY CLAIMS FOR EMPLOYEES", "STUDENT SIGN IN (GOOGLE) + MY REQUESTS", "EMPLOYEE LOG IN / LOG OUT", "INITIAL PAGE LOAD"
 - `public/js/firebase.js`
 - New file `public/js/pickups.js`
 
@@ -207,6 +208,8 @@ If you are an AI agent working for one of the team members:
 - [x] Connect the site to the database (pull request #2).
 - [x] Security rules, employee login, and employee-only private details (#3), then deploy.
 - [x] Write `docs/DATA.md`.
+- [x] Student sign-in with Google: claims need sign-in and use the account's name and email; new **My Requests** tab; rules let students read only their own claims.
+- [ ] (human) Firebase console → Authentication → Sign-in method → turn on **Google**; set the Public-facing name to "Rexburg Lost & Found".
 
 **Week 3–4**
 - [ ] (human) Create an employee account for each teammate: Authentication → Add user, plus a `users/{uid}` document with `role: "admin"` (steps in `docs/DATA.md`).
@@ -311,6 +314,7 @@ public/
     #admin: login, Claims to Review     Jaime
     #admin: Recent Lost Reports         Evan
     #claimModal (claim popup)           Jaime
+    #requests (My Requests), header sign-in  Jaime
   script.js         main code; each "// ====" section has an owner (see §R)
   styles.css        shared: Braden + Trevor
   js/firebase.js    Firebase setup                         Jaime  (shared)
