@@ -597,7 +597,7 @@ function filterItems() {
 
             const matchesColor =
                 color === "all" ||
-                item.color === color;
+                item.color.toLowerCase() === color.toLowerCase();
 
             const matchesLocation =
                 location === "all" ||
