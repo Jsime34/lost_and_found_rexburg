@@ -595,9 +595,11 @@ function filterItems() {
                 category === "all" ||
                 item.category === category;
 
+            // Colors are typed by employees, so ignore upper/lower case
+            // ("blue" = "Blue") and allow extra words ("dark blue" matches Blue).
             const matchesColor =
                 color === "all" ||
-                item.color === color;
+                item.color.toLowerCase().includes(color.toLowerCase());
 
             const matchesLocation =
                 location === "all" ||
