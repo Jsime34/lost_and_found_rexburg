@@ -336,7 +336,8 @@ main {
     padding: 18px;
     border-radius: 12px;
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr;
+    /* search box + 3 filters (category, color, location) on one row */
+    grid-template-columns: 2fr 1fr 1fr 1fr;
     gap: 12px;
     margin-bottom: 15px;
 }
