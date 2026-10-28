@@ -132,7 +132,7 @@ If you are an AI agent working for one of the team members:
   - deploy only from `main` with `firebase deploy`
 - [x] (human) Firebase console → Authentication → Settings → Authorized domains: add `127.0.0.1`, so employee login works with Live Server.
 - [x] Color filter: a dropdown next to Category, using the same color list as Trevor's form.
-- [ ] Search also matches `brand` (after Trevor adds it), and the card shows the brand.
+- [x] Search also matches `brand` (after Trevor adds it), and the card shows the brand.
 - [ ] Sort: "Newest first" / "Oldest first" dropdown.
 - [ ] **Needed for Nov 2:** cards show "In lost & found for 3 days · 27 days left before donation". `js/time.js` is ready: `import { timeCounterText } from "./js/time.js";` then `timeCounterText(item.foundAt)` gives the whole sentence.
 - [ ] **Needed for Nov 2:** hide items whose `status` is `picked_up` or `donated`. A missing status counts as available. (Recording a pickup already sets `status: "picked_up"`.)

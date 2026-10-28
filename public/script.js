@@ -207,6 +207,7 @@ function normalizeItem(item) {
         name: String(item.name || item.title || "Unnamed item"),
         category: String(item.category || item.type || "Other"),
         color: String(item.color || "Unknown"),
+        brand: String(item.brand || ""),
         location: String(item.location || item.locationName || item.foundWhere || "Unknown"),
         description: String(item.description || "No description provided."),
         icon: String(item.icon || "📦")
@@ -489,6 +490,11 @@ function createItemCard(item) {
                     </p>
 
                     <p>
+                        <strong>Brand:</strong>
+                        ${escapeHtml(item.brand || "Not listed")}
+                    </p>
+
+                    <p>
                         <strong>📍 Found:</strong>
                         ${escapeHtml(item.location)}
                     </p>
@@ -625,7 +631,8 @@ function filterItems() {
             const matchesSearch =
                 item.name.toLowerCase().includes(search) ||
                 item.description.toLowerCase().includes(search) ||
-                item.color.toLowerCase().includes(search);
+                item.color.toLowerCase().includes(search) ||
+                item.brand.toLowerCase().includes(search);
 
             const matchesCategory =
                 category === "all" ||
