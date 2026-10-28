@@ -29,9 +29,9 @@ Fields marked *(planned)* don't exist yet. The person in brackets adds them.
 | `foundAt` | timestamp | | when it was found; drives the time counter |
 | `description` | text | `"32oz bottle with dents"` | what the public can see |
 | `icon` | text | `"🥤"` | emoji shown when there's no photo |
-| `brand` | text | `"Hydro Flask"` | *(planned, Trevor)* |
+| `brand` | text | `"Hydro Flask"` | from the "Record Found Item" form; may be empty |
 | `photo` | text | `"data:image/jpeg;base64,…"` | *(planned, Trevor)* small photo shrunk in the browser (about 400 px wide) |
-| `status` | text | `"available"` | *(planned)* `available`, `picked_up` (Jaime) or `donated` (Trevor). A missing status means `available`. |
+| `status` | text | `"available"` | `available`, `picked_up` (set by Record Pickup) or `donated` *(planned, Trevor)*. A missing status means `available`. Claims are only accepted while it's `available`. |
 
 **Read:** everyone · **Add / change / delete:** employees only.
 **Never** put private details here; the rules reject any item with a `privateDetails` field.
@@ -72,33 +72,43 @@ Same document id as the item in `items`. Saved together with the item in one bat
 | `userName` | text | their Google name (or email), max 100 |
 | `email` | text | their Google account's email; must match their account, max 200 |
 | `verification` | text | what the student says proves it's theirs, max 2000 |
-| `status` | text | `"Pending"` when created. Later *(planned, Jaime)*: `"Approved"`, `"Rejected"`, `"Picked up"` |
+| `forFriend` | true/false | "I'm asking for a friend" (the friend picks it up) |
+| `friendName` | text | required (max 80) when `forFriend` is true, otherwise `""` |
+| `friendContact` | text | optional (max 120) when `forFriend` is true, otherwise `""` |
+| `status` | text | `"Pending"` when created → `"Approved"` / `"Rejected"` → `"Picked up"` (set by employees) |
 | `createdAt` | timestamp | must be `serverTimestamp()` |
-| `forFriend` | true/false | *(planned, Jaime)* request for a friend |
-| `friendName` | text | *(planned, Jaime)* required when `forFriend` is true |
-| `friendContact` | text | *(planned, Jaime)* optional |
-| `adminNote` | text | *(planned, Jaime)* note from the employee who approved/rejected |
+| `adminNote` | text | added by employees: note for the student when approving/rejecting |
+| `reviewedBy` | text | added by employees: email of the employee who approved/rejected/released it |
+| `reviewedAt` | timestamp | added by employees |
 
-**Create:** signed-in students, in their own name only (exactly the fields above that aren't
-*planned*, with status `"Pending"`) · **Read:** the student who sent it, and employees ·
+**Create:** signed-in students, in their own name only, for an item that's still `available`
+(exactly the fields from `itemId` to `createdAt`, with status `"Pending"`) ·
+**Read:** the student who sent it, and employees ·
 **Change / delete:** employees only (students can't approve their own claim).
 
 My Requests loads a student's claims with `where("userId", "==", their uid)`; the rules reject
 any query that could return someone else's claims.
 
-## `pickups` *(planned, Jaime)*: who took an item home
+## `pickups`: who took an item home (theft-control log)
+
+Saved by **Record Pickup** (code in `public/js/pickups.js`), in one batch together with: the claim
+→ `"Picked up"`, the item → `status: "picked_up"`, and any other open claims for that item →
+`"Rejected"`.
 
 | Field | Type | Notes |
 |---|---|---|
 | `itemId` | text | |
 | `itemName` | text | |
-| `claimId` | text | the approved claim, if any |
-| `pickedUpByName` | text | the person at the desk (may be the student's friend) |
-| `idLast4` | text | last 4 characters of their photo ID, **never** the full number |
-| `releasedBy` | text | email of the employee who handed it over |
+| `claimId` | text | the approved claim |
+| `claimedBy` | text | name (or email) of the student who sent the claim |
+| `forFriend` | true/false | copied from the claim |
+| `pickedUpByName` | text | the person at the desk (may be the student's friend), max 80 |
+| `idLast4` | text | exactly 4 characters (A–Z, 0–9) of their photo ID, **never** the full number |
+| `releasedBy` | text | email of the employee who handed it over; must be the logged-in employee |
 | `pickedUpAt` | timestamp | `serverTimestamp()` |
 
-**Read / write:** employees only.
+**Read / add:** employees only · **Change / delete:** nobody from the website (only in the
+Firebase console), so the log can be trusted.
 
 ## `users/{uid}`: employee list
 
