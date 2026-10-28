@@ -49,32 +49,32 @@ If you are an AI agent working for one of the team members:
 
 ---
 
-## 0. Current state (as of Wed Oct 14, 2026)
+## 0. Current state (as of Wed Oct 28, 2026)
 
-**Working on the live site:**
+**Working on the live site** (or in the WS4 pull request, waiting to merge):
 - **Home page:** intro, stats (unclaimed items, found this week, places with items), recent items
-- **Found Items:** search by text, plus category and location filters
+- **Found Items:** search by text, plus category, color and location filters
 - **Report Lost Item:** students send a lost report
-- **"This Might Be Mine":** students **sign in with Google** and send a claim with a description; their name and email come from their Google account
-- **My Requests:** signed-in students see their own claims and each one's status
+- **"This Might Be Mine":** students **sign in with Google** and send a claim with a description; their name and email come from their Google account. They can ask **for a friend** (the friend picks it up).
+- **My Requests:** signed-in students see their own claims, each one's status (Pending / Approved / Rejected / Picked up) and the desk's note
 - **Employees page:**
   - log in (employee accounts only)
-  - record a found item, with private details kept employee-only
+  - record a found item (with brand), with private details kept employee-only
   - "Add sample items" button, shown when the database is empty
   - list of lost reports
-  - list of claims, shown next to each item's private details
+  - **Claims to Review:** private details next to each claim, **Approve / Reject** with a note, then **Record Pickup** (who took it + last 4 of their ID). Recording a pickup marks the item `picked_up` and rejects other open claims for it.
+  - **Pickup Log:** who took each item home and which employee released it; it can't be edited from the website
+- **Time counter helpers** (`js/time.js`), ready for Evan's cards
 - **Security rules:** visitors can't read private details, lost reports, claims or the employee
-  list, and only employees can change items
+  list; students only see their own claims; only employees change items and record pickups;
+  nobody can claim an item that's already picked up
 
 **Not built yet** (see §R):
-- time counter
-- map
-- edit/remove items
-- photos
-- brand and color filters
-- request for a friend
-- approving claims
-- recording pickups
+- time counter **on the cards** (Evan; the helpers are ready)
+- hiding picked-up/donated items from search (Evan)
+- map and real locations (Braden)
+- color dropdown, `status` on new items, edit/remove/donate, photos (Trevor)
+- sort, brand in search (Evan)
 
 **History:**
 - **Sep 23–30:** plan written, then simplified to HTML/CSS/JS + Firebase.
@@ -83,6 +83,13 @@ If you are an AI agent working for one of the team members:
   - connected to the database (pull request #2)
   - security rules, employee login and private details (#3)
   - deployed
+- **Oct 21:**
+  - Home section fix and no-cache setting (#5)
+  - color filter (Evan, then fixed in #6)
+  - Brand field (Trevor)
+  - Google sign-in + My Requests (#7)
+- **Oct 26:** full-flow check postponed (approve/pickup didn't exist yet). New date: **Mon Nov 2**.
+- **Oct 28:** Jaime took over `time.js` from Braden. WS4 done: approve/reject, for a friend, pickups, pickup log.
 
 **The code is one page.** `index.html` has sections that the nav buttons show and hide, and
 `script.js` holds the code. This replaced the earlier idea of separate HTML pages.
@@ -93,16 +100,17 @@ If you are an AI agent working for one of the team members:
 
 | Person | Owns | Remaining focus |
 |---|---|---|
-| **Evan** | Search, item cards, lost reports, deploy setup | Brand/color filters, sort, time counter on cards, hide picked-up items, README |
-| **Trevor** | Employee item tools, photos, security rules | Edit/remove/donate items, photos, brand + color dropdown |
-| **Braden** | Design, locations, map, time counter | Real locations, map page, time counter, mobile fixes, then help Jaime |
-| **Jaime** | Coordination, Firebase, login, claims & pickups | Request for a friend, approve/reject claims, record pickups, pickup log |
+| **Evan** | Search, item cards, lost reports, deploy setup | **Hide picked-up items** and **time counter on cards** (both needed for Nov 2), then sort, brand in search |
+| **Trevor** | Employee item tools, photos, security rules | Color dropdown, `status` on new items, edit/remove/donate, photos; review WS4 rules |
+| **Braden** | Design, locations, map | Real locations, map page, mobile fixes (`time.js` was taken over by Jaime) |
+| **Jaime** | Coordination, Firebase, login, claims & pickups | Coordination, the Nov 2 full-flow check, helping whoever is behind |
 
-**Order that matters (weeks 3–4):**
-- **Early this week:**
-  - **Braden's `locations.js` + `time.js`.** Evan needs them for the cards; Braden's map needs the locations.
-  - **Trevor's `status`, `brand` and color dropdown.** Evan's filters need them.
-- **Jaime's pickups** set item `status` to `picked_up`, and Evan hides those items.
+**Order that matters (week 5, before the Mon Nov 2 full-flow check):**
+- **By Fri Oct 30:**
+  - **Evan:** hide picked-up/donated items from search (Jaime's pickups already set `status: "picked_up"`), and show the time counter on cards (`js/time.js` is ready).
+  - **Trevor:** `status: "available"` on new items, and the color dropdown.
+  - **Braden:** `locations.js` with the real desks (his map needs it).
+- **Mon Nov 2:** full-flow check (§5).
 
 ### Evan: search & item cards
 
@@ -126,8 +134,8 @@ If you are an AI agent working for one of the team members:
 - [x] Color filter: a dropdown next to Category, using the same color list as Trevor's form.
 - [ ] Search also matches `brand` (after Trevor adds it), and the card shows the brand.
 - [ ] Sort: "Newest first" / "Oldest first" dropdown.
-- [ ] Cards show "In lost & found for 3 days · 27 days left" using Braden's `time.js`.
-- [ ] Hide items whose `status` is `picked_up` or `donated`. A missing status counts as available.
+- [ ] **Needed for Nov 2:** cards show "In lost & found for 3 days · 27 days left before donation". `js/time.js` is ready: `import { timeCounterText } from "./js/time.js";` then `timeCounterText(item.foundAt)` gives the whole sentence.
+- [ ] **Needed for Nov 2:** hide items whose `status` is `picked_up` or `donated`. A missing status counts as available. (Recording a pickup already sets `status: "picked_up"`.)
 - [ ] Cards show the item's `photo` when it has one (after Trevor adds photos), and the emoji otherwise.
 
 **Others wait on you for:** brand/color filters and sort before the week 5 full-flow check.
@@ -149,9 +157,9 @@ If you are an AI agent working for one of the team members:
 - [x] "Add sample items" button.
 
 **Week 3–4**
-- [x] "Record Found Item" form:
-  - [x] add a **Brand** field
-  - change **Color** to a dropdown with a fixed list (share the list with Evan)
+- [ ] "Record Found Item" form:
+  - [x] add a **Brand** field. (Small fix: it's inside the Color `form-group`; give it its own `<div class="form-group">` so it has normal spacing.)
+  - [ ] change **Color** to a dropdown with a fixed list (use the same colors as Evan's color filter, including Silver)
 - [ ] New items get `status: "available"`.
 - [ ] Employee list of all items (new panel), with buttons:
   - **Edit**
@@ -162,25 +170,23 @@ If you are an AI agent working for one of the team members:
   - save it as the item's `photo` field (see §7 for why not Firebase Storage)
 - [ ] Review the rules changes in Jaime's pickups pull request.
 
-**Others wait on you for:** the `status`, `brand` and color list (Evan, early week 3).
+**Others wait on you for:** `status: "available"` and the color list (by Fri Oct 30).
 **You wait on:** nothing.
 
-### Braden: design, locations, map & time counter
+### Braden: design, locations & map
 
 **Owns:**
 - **`index.html`:** the `#home` section, the header/nav, and the new `#map` section
 - **`script.js`:** the sections "PAGE NAVIGATION" and "UPDATE HOME PAGE STATISTICS"
 - `styles.css` (shared with Trevor)
-- New files `public/js/locations.js`, `public/js/time.js`, `public/js/map.js`
+- New files `public/js/locations.js`, `public/js/map.js`
 
 **Week 3–4**
 - [ ] (human) Find the real lost & found desks: which buildings run one, their hours, and how long they keep items. Start with the Manwaring Center information desk. Write them in `docs/locations.md`.
 - [ ] **Early week 3, Evan and Trevor need it:** `js/locations.js`.
   - It's a list of the desks: name, latitude/longitude, hours, and `holdDays` (how long items are kept).
   - Replace the made-up "Library / Student Union / Science Building / Gym / Business Building" options in all 3 location dropdowns with the real ones.
-- [ ] **Early week 3, Evan needs it:** `js/time.js`, with two helpers.
-  - `timeInLostAndFound(foundAt)` returns text like `"3 days"`.
-  - `daysLeft(foundAt, holdDays)` returns a number.
+- [x] `js/time.js`: **taken over and done by Jaime (Oct 28)** so Evan wasn't blocked. When `locations.js` has `holdDays` per desk, pass it as the second argument of `timeCounterText` / `daysLeft`.
 - [ ] Map page:
   - add a **Map** nav button and a `#map` section
   - use Leaflet + OpenStreetMap, loaded from their links
@@ -188,9 +194,9 @@ If you are an AI agent working for one of the team members:
   - a "See items here" button opens Found Items filtered to that location
 - [ ] Mobile fix: on short screens the claim popup can't scroll, so its **Submit Claim** button is out of reach. Add `overflow-y: auto` to `.modal` in `styles.css`.
 - [ ] Check every section at phone width (375 px).
-- [ ] When this is done, help Jaime with WS4.
+- [ ] When this is done, help Evan or Trevor, whoever is behind. (WS4 is done.)
 
-**Others wait on you for:** `locations.js` and `time.js` (Evan, Trevor, early week 3).
+**Others wait on you for:** `locations.js` (real desks for the location filters and the map, by Fri Oct 30).
 **You wait on:** nothing.
 
 ### Jaime: coordination, login, claims & pickups
@@ -200,7 +206,8 @@ If you are an AI agent working for one of the team members:
 - **`index.html`:** the employee login and the "Claims to Review" panel inside `#admin`, the claim popup (`#claimModal`), the `#requests` section (My Requests), and the Google sign-in area in the header (`.auth-area`)
 - **`script.js`:** the sections "FIREBASE", "HELPERS", "LOAD DATA FROM FIREBASE", "CLAIM MODAL", "SUBMIT CLAIM", "DISPLAY CLAIMS FOR EMPLOYEES", "STUDENT SIGN IN (GOOGLE) + MY REQUESTS", "EMPLOYEE LOG IN / LOG OUT", "INITIAL PAGE LOAD"
 - `public/js/firebase.js`
-- New file `public/js/pickups.js`
+- `public/js/pickups.js` (approve, reject, record pickup, pickup log)
+- `public/js/time.js` (taken over from Braden)
 
 **Done**
 - [x] Push `MASTER_PLAN.md` to GitHub.
@@ -209,22 +216,24 @@ If you are an AI agent working for one of the team members:
 - [x] Security rules, employee login, and employee-only private details (#3), then deploy.
 - [x] Write `docs/DATA.md`.
 - [x] Student sign-in with Google: claims need sign-in and use the account's name and email; new **My Requests** tab; rules let students read only their own claims.
-- [ ] (human) Firebase console → Authentication → Sign-in method → turn on **Google**; set the Public-facing name to "Rexburg Lost & Found".
+- [x] (human) Firebase console → Authentication → Sign-in method → turn on **Google**; set the Public-facing name to "Rexburg Lost & Found".
+- [x] `js/time.js` time-counter helpers (taken over from Braden, Oct 28).
 
-**Week 3–4**
+**Week 3–5**
 - [ ] (human) Create an employee account for each teammate: Authentication → Add user, plus a `users/{uid}` document with `role: "admin"` (steps in `docs/DATA.md`).
 - [ ] (human) Protect `main` on GitHub (Settings → Branches): require a pull request with 1 approval.
 - [ ] (human) Share this updated plan with the team and get a 👍 from everyone.
-- [ ] Claim popup: a "This is for a friend" checkbox that shows the friend's name and contact fields. Update `docs/DATA.md` and `firestore.rules` for the new fields.
-- [ ] Claims to Review: **Approve** / **Reject** buttons with an optional note.
-- [ ] **Record pickup** on an approved claim:
+- [x] Claim popup: a "This is for a friend" checkbox that shows the friend's name and contact fields. Update `docs/DATA.md` and `firestore.rules` for the new fields.
+- [x] Claims to Review: **Approve** / **Reject** buttons with an optional note.
+- [x] **Record pickup** on an approved claim:
   - ask who is picking it up and the last 4 characters of their ID
-  - save a `pickups` document, set the item's `status` to `picked_up`, and set the claim to `"Picked up"`, all in one batch
-- [ ] Pickup log panel for employees: every pickup, newest first.
-- [ ] Rules for `pickups` and the claim updates (Trevor reviews).
+  - save a `pickups` document, set the item's `status` to `picked_up`, and set the claim to `"Picked up"`, all in one batch (other open claims for the item are rejected in the same batch)
+- [x] Pickup log panel for employees: every pickup, newest first. It can't be edited or deleted from the website.
+- [x] Rules for `pickups` and the claim updates (Trevor reviews).
+- [ ] (human) Run the full-flow check with the team on **Mon Nov 2** (§5).
 
-**Others wait on you for:** `status: "picked_up"` (Evan hides those items).
-**You wait on:** Trevor's `status` field.
+**Others wait on you for:** nothing right now.
+**You wait on:** Evan (hide picked-up items, time counter on cards) for the full-flow check.
 
 ---
 
@@ -240,12 +249,12 @@ who took an item home. This app:
 
 | # | Feature (from our submission) | Owner | Status |
 |---|---|---|---|
-| 1 | Search and filter by type, color, brand and location | Evan | 🟡 Text, category and location work; color, brand and sort to do |
-| 2 | Employees can add and remove items | Trevor | 🟡 Adding works; edit/remove/donate to do |
-| 3 | Time counter: how long an item has been there, and days left before it's donated | Braden (helpers) + Evan (cards) | 🔴 To do |
+| 1 | Search and filter by type, color, brand and location | Evan | 🟡 Text, category, color and location work; brand in search and sort to do |
+| 2 | Employees can add and remove items | Trevor | 🟡 Adding works (with brand); edit/remove/donate to do |
+| 3 | Time counter: how long an item has been there, and days left before it's donated | Jaime (helpers) + Evan (cards) | 🟡 Helpers done (`js/time.js`); showing it on the cards to do |
 | 4 | Map of lost & found locations | Braden | 🔴 To do |
-| 5 | Request an item for a friend | Jaime | 🔴 To do (claims work, the friend option doesn't exist yet) |
-| 6 | Record of who picked the item up | Jaime | 🔴 To do |
+| 5 | Request an item for a friend | Jaime | ✅ Done (WS4 pull request) |
+| 6 | Record of who picked the item up | Jaime | ✅ Done: Record Pickup + Pickup Log (WS4 pull request) |
 | 7 | Post a picture of each item | Trevor | 🔴 To do |
 | + | Lost reports (students describe what they lost) | Evan | ✅ Done |
 | + | Private details only employees see, shown next to claims | Jaime | ✅ Done |
@@ -343,10 +352,10 @@ Assumes a final demo the week of Nov 30, 2026. Adjust the dates to the course ca
 | Week | Dates | Goal | Status |
 |---|---|---|---|
 | 1–2 | Sep 28 – Oct 9 | Setup: Firebase, live site, first front end | ✅ Done |
-| 3 | Oct 12–16 | Database connection, security rules, employee login (done). Start features: `locations.js`, `time.js`, `status`, `brand`, color list | 👉 **We are here** |
-| 4 | Oct 19–23 | Features: filters, sort, time counter on cards, edit/remove, photos, map, for-a-friend, approve/reject, pickups | |
-| 5 | Oct 26 | **Full-flow check:** employee adds an item with a photo → student finds it → requests it for a friend → employee approves → friend picks it up → it shows in the pickup log and disappears from search | |
-| 6 | Nov 2 | Make it solid: phone layout, loading/empty/error messages, real location data | |
+| 3 | Oct 12–16 | Database connection, security rules, employee login | ✅ Done |
+| 4 | Oct 19–23 | Features: color filter, brand, Google sign-in + My Requests | ✅ Done (map, photos, edit/remove still open) |
+| 5 | Oct 26–30 | WS4 done (for a friend, approve/reject, pickups, pickup log) + `time.js`. By Fri: hide picked-up items, time counter on cards, `status`, color dropdown, `locations.js` | 👉 **We are here** |
+| 6 | **Mon Nov 2** | **Full-flow check** (moved from Oct 26): employee adds an item → student finds it → requests it for a friend → employee approves → friend picks it up → it shows in the pickup log and disappears from search. Then: phone layout, loading/empty/error messages, real location data, map, photos | |
 | 7 | Nov 9 | One optional extra per person (§8) | |
 | 8 | Nov 16 | Test with 3–5 real students on the live site | |
 | 9 | Nov 23 | Fix the top feedback (short week, Thanksgiving) | |

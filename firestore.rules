@@ -54,7 +54,8 @@ service cloud.firestore {
     function isValidClaim() {
       let claim = request.resource.data;
       let fields = ["itemId", "itemName", "userId", "userName", "email",
-                    "verification", "status", "createdAt"];
+                    "verification", "forFriend", "friendName", "friendContact",
+                    "status", "createdAt"];
 
       return claim.keys().hasOnly(fields)
         && claim.keys().hasAll(fields)
@@ -65,9 +66,47 @@ service cloud.firestore {
         && isText(claim.userName, 100)
         && isText(claim.email, 200)
         && isText(claim.verification, 2000)
+        && isValidFriendPart(claim)
         && claim.status == "Pending"
         && claim.createdAt == request.time
-        && exists(/databases/$(database)/documents/items/$(claim.itemId));
+        && isStillAvailable(claim.itemId);
+    }
+
+    // "Request for a friend": a friend's name is required; contact is optional.
+    // Not for a friend: both must be empty.
+    function isValidFriendPart(claim) {
+      return claim.friendContact is string
+        && claim.friendContact.size() <= 120
+        && ((claim.forFriend == true && isText(claim.friendName, 80))
+            || (claim.forFriend == false && claim.friendName == "" && claim.friendContact == ""));
+    }
+
+    // The item exists and hasn't been picked up or donated yet.
+    // (Items with no status yet count as available.)
+    function isStillAvailable(itemId) {
+      return get(/databases/$(database)/documents/items/$(itemId)).data.get("status", "available") == "available";
+    }
+
+    // A pickup record (who took an item home). Only the LAST 4 characters
+    // of an ID are allowed, never a full ID number, and it must be saved by
+    // the employee who is logged in.
+    function isValidPickup() {
+      let pickup = request.resource.data;
+      let fields = ["itemId", "itemName", "claimId", "claimedBy", "forFriend",
+                    "pickedUpByName", "idLast4", "releasedBy", "pickedUpAt"];
+
+      return pickup.keys().hasOnly(fields)
+        && pickup.keys().hasAll(fields)
+        && isText(pickup.itemId, 100)
+        && isText(pickup.itemName, 100)
+        && isText(pickup.claimId, 100)
+        && isText(pickup.claimedBy, 100)
+        && pickup.forFriend is bool
+        && isText(pickup.pickedUpByName, 80)
+        && pickup.idLast4 is string
+        && pickup.idLast4.matches("^[0-9A-Z]{4}$")
+        && pickup.releasedBy == request.auth.token.email
+        && pickup.pickedUpAt == request.time;
     }
 
     // ---------- Collections ----------
@@ -100,14 +139,21 @@ service cloud.firestore {
       allow read, update, delete: if isEmployee();
     }
 
-    // Claims: anyone can send one, only employees can read them.
     // Claims: signed-in students can send one and read their own.
-    // Employees can read and change all of them.
+    // Employees can read and change all of them (approve, reject, picked up).
     match /claims/{claimId} {
       allow create: if request.auth != null && isValidClaim();
       allow read: if isEmployee()
         || (request.auth != null && resource.data.userId == request.auth.uid);
       allow update, delete: if isEmployee();
+    }
+
+    // Pickup log: employees can add records and read them. Nobody can change
+    // or delete a record from the website, so the log can be trusted.
+    match /pickups/{pickupId} {
+      allow read: if isEmployee();
+      allow create: if isEmployee() && isValidPickup();
+      allow update, delete: if false;
     }
 
     // Anything not listed above is blocked.

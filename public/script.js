@@ -30,6 +30,16 @@ import {
     signInWithPopup
 } from "./js/firebase.js";
 
+// Employee actions on claims: approve, reject, record pickup (WS4).
+import {
+    PENDING,
+    APPROVED,
+    approveClaim,
+    rejectClaim,
+    recordPickup,
+    loadPickups
+} from "./js/pickups.js";
+
 
 // Public data (everyone). Filled in by loadEverything().
 let foundItems = [];
@@ -38,6 +48,7 @@ let foundItems = [];
 let lostReports = [];
 let claims = [];
 let itemSecrets = {};   // private details of each found item, by item id
+let pickups = [];       // who took each item home (pickup log)
 
 // The signed-in account (a student with Google, or an employee), or null.
 let currentUser = null;
@@ -293,16 +304,26 @@ async function loadClaims() {
 }
 
 
+async function loadPickupLog() {
+
+    pickups = await loadPickups();
+
+    displayPickups();
+}
+
+
 async function loadEmployeeData() {
 
     showMessage("adminLostReports", "Loading lost reports...");
     showMessage("adminClaims", "Loading claims...");
+    showMessage("adminPickups", "Loading pickups...");
 
     try {
 
         await loadItemSecrets();
         await loadLostReports();
         await loadClaims();
+        await loadPickupLog();
 
     } catch (error) {
 
@@ -316,6 +337,11 @@ async function loadEmployeeData() {
         showMessage(
             "adminClaims",
             "Couldn't load claims. Refresh the page to try again."
+        );
+
+        showMessage(
+            "adminPickups",
+            "Couldn't load the pickup log. Refresh the page to try again."
         );
     }
 }
@@ -701,6 +727,28 @@ document.getElementById("claimSignInBtn").addEventListener(
 );
 
 
+// "I'm asking for a friend" checkbox: shows the friend's name and contact
+// fields, and makes the name required.
+const claimForFriend =
+    document.getElementById("claimForFriend");
+
+function updateFriendFields() {
+
+    const friendFields = document.getElementById("friendFields");
+    const friendName = document.getElementById("claimFriendName");
+
+    if (claimForFriend.checked) {
+        friendFields.classList.remove("hidden");
+        friendName.required = true;
+    } else {
+        friendFields.classList.add("hidden");
+        friendName.required = false;
+    }
+}
+
+claimForFriend.addEventListener("change", updateFriendFields);
+
+
 function addClaimButtonEvents() {
 
     const claimButtons =
@@ -723,6 +771,11 @@ function addClaimButtonEvents() {
                             return foundItem.id === itemId;
                         }
                     );
+
+
+                // Start each claim with an empty form.
+                claimForm.reset();
+                updateFriendFields();
 
 
                 document.getElementById(
@@ -824,7 +877,19 @@ claimForm.addEventListener(
                     "claimDescription"
                 ).value,
 
-            status: "Pending",
+            // "Request for a friend": the friend picks it up at the desk.
+            // Empty text when it's not for a friend (the rules check this).
+            forFriend: claimForFriend.checked,
+
+            friendName: claimForFriend.checked
+                ? document.getElementById("claimFriendName").value.trim()
+                : "",
+
+            friendContact: claimForFriend.checked
+                ? document.getElementById("claimFriendContact").value.trim()
+                : "",
+
+            status: PENDING,
 
             createdAt: serverTimestamp()
 
@@ -842,6 +907,7 @@ claimForm.addEventListener(
             await addDoc(collection(db, "claims"), newClaim);
 
             claimForm.reset();
+            updateFriendFields();
 
             claimForm.classList.add("hidden");
 
@@ -861,7 +927,12 @@ claimForm.addEventListener(
 
             console.error(error);
 
-            alert("Sorry, your claim couldn't be saved. Please try again.");
+            // The rules refuse claims on items already picked up or donated.
+            if (error.code === "permission-denied") {
+                alert("This item may no longer be in the lost & found. Refresh the page to see the latest list.");
+            } else {
+                alert("Sorry, your claim couldn't be saved. Please try again.");
+            }
 
         } finally {
 
@@ -1242,6 +1313,89 @@ function displayLostReports() {
 // DISPLAY CLAIMS FOR EMPLOYEES
 // ==========================================
 
+// The colored label for a claim status, e.g. "Picked up" → status-picked-up
+// (colors are in styles.css). Also used by My Requests.
+function statusBadge(status) {
+
+    const statusClass =
+        "status-" + String(status).toLowerCase().replace(/\s+/g, "-");
+
+    return `
+        <span class="status-badge ${escapeHtml(statusClass)}">
+            ${escapeHtml(status)}
+        </span>
+    `;
+}
+
+
+// Buttons for the next step of a claim:
+//   Pending  → note + Approve / Reject
+//   Approved → who's picking it up + last 4 of ID → Record Pickup (or Reject)
+//   Rejected / Picked up → nothing left to do
+function claimActions(claim) {
+
+    if (claim.status === PENDING) {
+
+        return `
+            <div class="claim-actions">
+                <input
+                    id="note-${escapeHtml(claim.id)}"
+                    type="text"
+                    maxlength="300"
+                    placeholder="Note for the student (optional)"
+                >
+                <div class="action-buttons">
+                    <button class="primary-btn" data-action="approve" data-claim-id="${escapeHtml(claim.id)}">
+                        Approve
+                    </button>
+                    <button class="secondary-btn" data-action="reject" data-claim-id="${escapeHtml(claim.id)}">
+                        Reject
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    if (claim.status === APPROVED) {
+
+        // Usually the student picks it up; for a friend request, the friend.
+        const expectedPerson =
+            claim.forFriend ? claim.friendName : (claim.userName || "");
+
+        return `
+            <div class="claim-actions">
+                <p class="panel-note">
+                    At the desk: check their photo ID, then record the pickup.
+                </p>
+                <input
+                    id="pickupName-${escapeHtml(claim.id)}"
+                    type="text"
+                    maxlength="80"
+                    value="${escapeHtml(expectedPerson)}"
+                    placeholder="Name of the person picking it up"
+                >
+                <input
+                    id="pickupId-${escapeHtml(claim.id)}"
+                    type="text"
+                    maxlength="4"
+                    placeholder="Last 4 characters of their photo ID"
+                >
+                <div class="action-buttons">
+                    <button class="primary-btn" data-action="pickup" data-claim-id="${escapeHtml(claim.id)}">
+                        Record Pickup
+                    </button>
+                    <button class="secondary-btn" data-action="reject" data-claim-id="${escapeHtml(claim.id)}">
+                        Reject
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    return "";
+}
+
+
 function displayClaims() {
 
     const container =
@@ -1265,28 +1419,47 @@ function displayClaims() {
     }
 
 
-    // claims is already sorted newest first.
-    claims.forEach(function(claim) {
+    // Claims that still need work first (Pending, then Approved), then the
+    // finished ones. Inside each group, newest first (claims is already).
+    const order = { [PENDING]: 0, [APPROVED]: 1 };
+
+    const sorted =
+        claims.slice().sort(function(first, second) {
+            return (order[first.status] ?? 2) - (order[second.status] ?? 2);
+        });
+
+
+    sorted.forEach(function(claim) {
 
         // What we know about the item but never showed the public.
         const privateDetails =
             itemSecrets[claim.itemId] || "No private details on file.";
 
+        const friendLine = claim.forFriend
+            ? `<p>
+                   <strong>For a friend:</strong>
+                   ${escapeHtml(claim.friendName)}${claim.friendContact ? " (" + escapeHtml(claim.friendContact) + ")" : ""}
+               </p>`
+            : "";
+
+        const noteLine = claim.adminNote
+            ? `<p><strong>Note:</strong> ${escapeHtml(claim.adminNote)}</p>`
+            : "";
+
         container.innerHTML += `
 
             <div class="report-card">
 
-                <h4>${escapeHtml(claim.itemName)}</h4>
+                ${statusBadge(claim.status)}
 
-                <p>
-                    <strong>Status:</strong>
-                    ${escapeHtml(claim.status)}
-                </p>
+                <h4>${escapeHtml(claim.itemName)}</h4>
 
                 <p>
                     <strong>Student:</strong>
                     ${escapeHtml(claim.userName ? claim.userName + " (" + claim.email + ")" : claim.email)}
                 </p>
+
+                ${friendLine}
 
                 <p>
                     <strong>Sent:</strong>
@@ -1302,6 +1475,183 @@ function displayClaims() {
                     🔒
                     <strong>Private details on file:</strong>
                     ${escapeHtml(privateDetails)}
+                </p>
+
+                ${noteLine}
+
+                ${claimActions(claim)}
+
+            </div>
+
+        `;
+
+    });
+
+}
+
+
+// One click listener for every claim button (Approve, Reject, Record Pickup).
+// The cards are redrawn often, so we listen on the list instead of on each
+// button, and read which claim from the button's data-claim-id.
+document.getElementById("adminClaims").addEventListener(
+    "click",
+    async function(event) {
+
+        const button = event.target.closest("button[data-action]");
+
+        if (!button || !currentEmployee) {
+            return;
+        }
+
+
+        const claimId = button.dataset.claimId;
+
+        const claim =
+            claims.find(function(c) {
+                return c.id === claimId;
+            });
+
+        if (!claim) {
+            return;
+        }
+
+
+        const noteInput = document.getElementById("note-" + claimId);
+        const note = noteInput ? noteInput.value.trim() : "";
+
+        button.disabled = true;
+
+
+        try {
+
+            if (button.dataset.action === "approve") {
+
+                await approveClaim(claimId, currentEmployee.email, note);
+
+            } else if (button.dataset.action === "reject") {
+
+                if (!confirm("Reject this claim for " + claim.itemName + "?")) {
+                    button.disabled = false;
+                    return;
+                }
+
+                await rejectClaim(claimId, currentEmployee.email, note);
+
+            } else if (button.dataset.action === "pickup") {
+
+                const pickedUpBy =
+                    document.getElementById("pickupName-" + claimId).value.trim();
+
+                const idLast4 =
+                    document.getElementById("pickupId-" + claimId).value.trim().toUpperCase();
+
+                if (pickedUpBy.length < 2) {
+                    alert("Enter the name of the person picking up the item.");
+                    button.disabled = false;
+                    return;
+                }
+
+                // Only the LAST 4 characters, never a full ID number (privacy).
+                if (!/^[0-9A-Z]{4}$/.test(idLast4)) {
+                    alert("Enter exactly 4 letters or numbers: the last 4 characters of their photo ID.");
+                    button.disabled = false;
+                    return;
+                }
+
+                // Any other open claims for the same item get rejected.
+                const otherOpenClaims =
+                    claims.filter(function(c) {
+                        return c.itemId === claim.itemId &&
+                            c.id !== claim.id &&
+                            (c.status === PENDING || c.status === APPROVED);
+                    });
+
+                await recordPickup(
+                    claim,
+                    otherOpenClaims,
+                    pickedUpBy,
+                    idLast4,
+                    currentEmployee.email
+                );
+
+                // The item is no longer in the lost & found.
+                await loadFoundItems();
+                await loadPickupLog();
+            }
+
+            await loadClaims();
+
+        } catch (error) {
+
+            console.error(error);
+
+            alert("Sorry, that didn't save. Please try again.");
+
+            button.disabled = false;
+        }
+
+    }
+);
+
+
+// ==========================================
+// PICKUP LOG FOR EMPLOYEES
+// ==========================================
+
+function displayPickups() {
+
+    const container =
+        document.getElementById(
+            "adminPickups"
+        );
+
+
+    container.innerHTML = "";
+
+
+    if (pickups.length === 0) {
+
+        container.innerHTML = `
+            <p>
+                No pickups recorded yet.
+            </p>
+        `;
+
+        return;
+    }
+
+
+    // pickups is already sorted newest first.
+    pickups.forEach(function(pickup) {
+
+        const claimedBy = pickup.forFriend
+            ? " (friend of " + pickup.claimedBy + ")"
+            : "";
+
+        container.innerHTML += `
+
+            <div class="report-card">
+
+                <h4>${escapeHtml(pickup.itemName)}</h4>
+
+                <p>
+                    <strong>Picked up by:</strong>
+                    ${escapeHtml(pickup.pickedUpByName + claimedBy)}
+                </p>
+
+                <p>
+                    <strong>ID (last 4):</strong>
+                    ${escapeHtml(pickup.idLast4)}
+                </p>
+
+                <p>
+                    <strong>Released by:</strong>
+                    ${escapeHtml(pickup.releasedBy)}
+                </p>
+
+                <p>
+                    <strong>When:</strong>
+                    ${escapeHtml(formatDate(pickup.pickedUpAt))}
                 </p>
 
             </div>
@@ -1488,10 +1838,14 @@ async function loadMyRequests() {
 
 
 // A short explanation for each claim status.
-function statusMessage(status) {
+function statusMessage(status, forFriend) {
 
     if (status === "Pending") {
         return "An employee will compare your description with the item.";
+    }
+
+    if (status === "Approved" && forFriend) {
+        return "Approved! Your friend can pick it up at the lost & found desk with a photo ID.";
     }
 
     if (status === "Approved") {
@@ -1547,19 +1901,23 @@ function displayMyRequests() {
 
     myClaims.forEach(function(claim) {
 
-        // e.g. "Picked up" → "status-picked-up" (colors in styles.css)
-        const statusClass =
-            "status-" + String(claim.status).toLowerCase().replace(/\s+/g, "-");
+        const friendLine = claim.forFriend
+            ? `<p><strong>For your friend:</strong> ${escapeHtml(claim.friendName)}</p>`
+            : "";
+
+        const noteLine = claim.adminNote
+            ? `<p><strong>Note from the desk:</strong> ${escapeHtml(claim.adminNote)}</p>`
+            : "";
 
         list.innerHTML += `
 
             <div class="report-card">
 
-                <span class="status-badge ${escapeHtml(statusClass)}">
-                    ${escapeHtml(claim.status)}
-                </span>
+                ${statusBadge(claim.status)}
 
                 <h4>${escapeHtml(claim.itemName)}</h4>
+
+                ${friendLine}
 
                 <p>
                     <strong>Sent:</strong>
@@ -1571,8 +1929,10 @@ function displayMyRequests() {
                     ${escapeHtml(claim.verification)}
                 </p>
 
+                ${noteLine}
+
                 <p class="status-note">
-                    ${escapeHtml(statusMessage(claim.status))}
+                    ${escapeHtml(statusMessage(claim.status, claim.forFriend))}
                 </p>
 
             </div>
@@ -1752,8 +2112,10 @@ onAuthStateChanged(auth, async function(user) {
         lostReports = [];
         claims = [];
         itemSecrets = {};
+        pickups = [];
         displayLostReports();
         displayClaims();
+        displayPickups();
     }
 
 });
