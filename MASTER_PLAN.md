@@ -133,10 +133,10 @@ If you are an AI agent working for one of the team members:
 - [x] (human) Firebase console → Authentication → Settings → Authorized domains: add `127.0.0.1`, so employee login works with Live Server.
 - [x] Color filter: a dropdown next to Category, using the same color list as Trevor's form.
 - [x] Search also matches `brand` (after Trevor adds it), and the card shows the brand.
-- [ ] Sort: "Newest first" / "Oldest first" dropdown.
-- [ ] **Needed for Nov 2:** cards show "In lost & found for 3 days · 27 days left before donation". `js/time.js` is ready: `import { timeCounterText } from "./js/time.js";` then `timeCounterText(item.foundAt)` gives the whole sentence.
-- [ ] **Needed for Nov 2:** hide items whose `status` is `picked_up` or `donated`. A missing status counts as available. (Recording a pickup already sets `status: "picked_up"`.)
-- [ ] Cards show the item's `photo` when it has one (after Trevor adds photos), and the emoji otherwise.
+- [x] Sort: "Newest first" / "Oldest first" dropdown.
+- [x] **Needed for Nov 2:** cards show "In lost & found for 3 days · 27 days left before donation". `js/time.js` is ready: `import { timeCounterText } from "./js/time.js";` then `timeCounterText(item.foundAt)` gives the whole sentence.
+- [x] **Needed for Nov 2:** hide items whose `status` is `picked_up` or `donated`. A missing status counts as available. (Recording a pickup already sets `status: "picked_up"`.)
+- [x] Cards show the item's `photo` when it has one (after Trevor adds photos), and the emoji otherwise.
 
 **Others wait on you for:** brand/color filters and sort before the week 5 full-flow check.
 **You wait on:**
@@ -399,7 +399,7 @@ call a week to try the live site together, and pull request reviews within 24 ho
 
 ## 8. Optional extras (week 7+)
 
-- **Evan:** keep the filters in the page address so searches can be shared; show employees possible matches between lost reports and found items
+- **Evan:** keep the filters in the page address; show employees possible matches between lost reports and found items
 - **Trevor:** a "donate all expired items" button
 - **Braden:** "open now" badge on each location; a walking-directions link; an employee page to edit locations
 - **Jaime:** a badge showing how many claims are waiting for review; Firebase App Check

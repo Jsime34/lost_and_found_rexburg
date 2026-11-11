@@ -40,6 +40,9 @@ import {
     loadPickups
 } from "./js/pickups.js";
 
+// Time counter shown on each found-item card.
+import { timeCounterText } from "./js/time.js";
+
 
 // Public data (everyone). Filled in by loadEverything().
 let foundItems = [];
@@ -210,7 +213,9 @@ function normalizeItem(item) {
         brand: String(item.brand || ""),
         location: String(item.location || item.locationName || item.foundWhere || "Unknown"),
         description: String(item.description || "No description provided."),
-        icon: String(item.icon || "📦")
+        icon: String(item.icon || "📦"),
+        photo: String(item.photo || ""),
+        status: String(item.status || "available").toLowerCase()
     };
 }
 
@@ -261,10 +266,14 @@ async function loadFoundItems() {
     // of the project.
     foundItems = (await loadCollection("items"))
         .map(normalizeItem)
+        .filter(function(item) {
+            return item.status !== "picked_up" && item.status !== "donated";
+        })
         .sort(function(first, second) {
             return dateToMillis(second.foundAt) - dateToMillis(first.foundAt);
         });
 
+    loadFiltersFromUrl();
     filterItems();
 
     displayRecentItems();
@@ -463,11 +472,16 @@ function getIcon(category) {
 
 function createItemCard(item) {
 
+    const timeText = timeCounterText(item.foundAt);
+    const itemVisual = item.photo
+        ? `<img src="${escapeHtml(item.photo)}" alt="Photo of ${escapeHtml(item.name)}">`
+        : escapeHtml(item.icon);
+
     return `
         <div class="item-card">
 
             <div class="item-image">
-                ${escapeHtml(item.icon)}
+                ${itemVisual}
             </div>
 
             <div class="item-info">
@@ -503,6 +517,13 @@ function createItemCard(item) {
                         <strong>📅 Date:</strong>
                         ${escapeHtml(formatDate(item.foundAt))}
                     </p>
+
+                    ${timeText ? `
+                    <p>
+                        <strong>⏱ Time:</strong>
+                        ${escapeHtml(timeText)}
+                    </p>
+                    ` : ""}
 
                 </div>
 
@@ -609,6 +630,9 @@ const colorFilter =
 const locationFilter =
     document.getElementById("locationFilter");
 
+const sortOrder =
+    document.getElementById("sortOrder");
+
 
 function filterItems() {
 
@@ -658,12 +682,45 @@ function filterItems() {
 
         });
 
+    const searchParams = new URLSearchParams();
+
+    if (search) searchParams.set("q", searchInput.value.trim());
+    if (category !== "all") searchParams.set("category", category);
+    if (color !== "all") searchParams.set("color", color);
+    if (location !== "all") searchParams.set("location", location);
+    if (sortOrder.value !== "newest") searchParams.set("sort", sortOrder.value);
+
+    const queryText = searchParams.toString();
+    const newUrl = window.location.pathname + (queryText ? "?" + queryText : "") + window.location.hash;
+    window.history.replaceState({}, "", newUrl);
+
+    filtered.sort(function(first, second) {
+        const difference =
+            dateToMillis(second.foundAt) - dateToMillis(first.foundAt);
+
+        return sortOrder.value === "oldest"
+            ? -difference
+            : difference;
+    });
+
 
     document.getElementById("resultsText").textContent =
         filtered.length + " item(s) found";
 
 
     displayFoundItems(filtered);
+}
+
+
+function loadFiltersFromUrl() {
+
+    const searchParams = new URLSearchParams(window.location.search);
+
+    searchInput.value = searchParams.get("q") || "";
+    categoryFilter.value = searchParams.get("category") || "all";
+    colorFilter.value = searchParams.get("color") || "all";
+    locationFilter.value = searchParams.get("location") || "all";
+    sortOrder.value = searchParams.get("sort") === "oldest" ? "oldest" : "newest";
 }
 
 
@@ -683,6 +740,11 @@ locationFilter.addEventListener(
 );
 
 colorFilter.addEventListener(
+    "change",
+    filterItems
+);
+
+sortOrder.addEventListener(
     "change",
     filterItems
 );
@@ -1244,6 +1306,63 @@ sampleDataBtn.addEventListener(
 // DISPLAY LOST REPORTS FOR EMPLOYEES
 // ==========================================
 
+function possibleMatchesForReport(report) {
+
+    const reportWords = (String(report.name || "") + " " + String(report.description || ""))
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(function(word) {
+            return word.length > 2;
+        });
+
+    return foundItems.map(function(item) {
+
+        const itemWords = (
+            item.name + " " + item.description + " " + item.brand
+        ).toLowerCase();
+
+        let score = 0;
+
+        if (item.category.toLowerCase() === String(report.category || "").toLowerCase()) {
+            score += 3;
+        }
+
+        if (item.color.toLowerCase() === String(report.color || "").toLowerCase()) {
+            score += 2;
+        }
+
+        reportWords.forEach(function(word) {
+            if (itemWords.includes(word)) score += 1;
+        });
+
+        return { item: item, score: score };
+
+    }).filter(function(match) {
+        return match.score > 0;
+    }).sort(function(first, second) {
+        return second.score - first.score;
+    }).slice(0, 3);
+}
+
+
+function possibleMatchesHtml(report) {
+
+    const matches = possibleMatchesForReport(report);
+
+    if (matches.length === 0) {
+        return "<p><strong>Possible matches:</strong> None yet</p>";
+    }
+
+    return `
+        <p><strong>Possible matches:</strong></p>
+        <ul>
+            ${matches.map(function(match) {
+                return `<li>${escapeHtml(match.item.name)} at ${escapeHtml(match.item.location)}</li>`;
+            }).join("")}
+        </ul>
+    `;
+}
+
 function displayLostReports() {
 
     const container =
@@ -1306,6 +1425,8 @@ function displayLostReports() {
                         <strong>Private details:</strong>
                         ${escapeHtml(report.privateDetails)}
                     </p>
+
+                    ${possibleMatchesHtml(report)}
 
                 </div>
 
