@@ -11,8 +11,8 @@ For example, if someone lost a blue Hydro Flask water bottle, the employee enter
 
 **Live site:** https://rexburg-lost-and-found.web.app
 
-**Status:** Week 3 of 10. The site is live and connected to Firebase, with security rules and an
-employee login. Now: building the remaining features (§R). This is a 101-level class project, so
+**Status:** Week 8 of 10 (final demo the week of Nov 30). 4 of the 7 promised features are done;
+**map, photos and removing items** are still missing (§R). This is a 101-level class project, so
 we use basic web technology (HTML, CSS, JavaScript) and Firebase.
 
 ---
@@ -49,11 +49,11 @@ If you are an AI agent working for one of the team members:
 
 ---
 
-## 0. Current state (as of Wed Oct 28, 2026)
+## 0. Current state (as of Wed Nov 18, 2026)
 
-**Working on the live site** (or in the WS4 pull request, waiting to merge):
+**Working** (on the live site after the next `firebase deploy`):
 - **Home page:** intro, stats (unclaimed items, found this week, places with items), recent items
-- **Found Items:** search by text, plus category, color and location filters
+- **Found Items:** search by text and brand, category / color / location filters, sort newest/oldest; filters are kept in the page address so searches can be shared. Each card shows the **time counter** ("In lost & found for 3 days · 27 days left before donation"). Picked-up and donated items are hidden.
 - **Report Lost Item:** students send a lost report
 - **"This Might Be Mine":** students **sign in with Google** and send a claim with a description; their name and email come from their Google account. They can ask **for a friend** (the friend picks it up).
 - **My Requests:** signed-in students see their own claims, each one's status (Pending / Approved / Rejected / Picked up) and the desk's note
@@ -61,20 +61,19 @@ If you are an AI agent working for one of the team members:
   - log in (employee accounts only)
   - record a found item (with brand), with private details kept employee-only
   - "Add sample items" button, shown when the database is empty
-  - list of lost reports
+  - list of lost reports, each with **possible matches** among the found items
   - **Claims to Review:** private details next to each claim, **Approve / Reject** with a note, then **Record Pickup** (who took it + last 4 of their ID). Recording a pickup marks the item `picked_up` and rejects other open claims for it.
   - **Pickup Log:** who took each item home and which employee released it; it can't be edited from the website
-- **Time counter helpers** (`js/time.js`), ready for Evan's cards
 - **Security rules:** visitors can't read private details, lost reports, claims or the employee
   list; students only see their own claims; only employees change items and record pickups;
   nobody can claim an item that's already picked up
 
-**Not built yet** (see §R):
-- time counter **on the cards** (Evan; the helpers are ready)
-- hiding picked-up/donated items from search (Evan)
-- map and real locations (Braden)
-- color dropdown, `status` on new items, edit/remove/donate, photos (Trevor)
-- sort, brand in search (Evan)
+**Not built yet** (see §R), **deadline Fri Nov 20**:
+- **#4 map** and the real locations (Braden)
+- **#7 photos** on the "Record Found Item" form (Trevor). The cards already show a photo when an item has one.
+- **#2 removing items** (and edit / mark as donated), the color dropdown, `status: "available"` on new items (Trevor)
+
+If these aren't pushed by Fri Nov 20, Jaime takes them over on the weekend (Nov 21–22).
 
 **History:**
 - **Sep 23–30:** plan written, then simplified to HTML/CSS/JS + Firebase.
@@ -89,7 +88,9 @@ If you are an AI agent working for one of the team members:
   - Brand field (Trevor)
   - Google sign-in + My Requests (#7)
 - **Oct 26:** full-flow check postponed (approve/pickup didn't exist yet). New date: **Mon Nov 2**.
-- **Oct 28:** Jaime took over `time.js` from Braden. WS4 done: approve/reject, for a friend, pickups, pickup log.
+- **Oct 28:** Jaime took over `time.js` from Braden. WS4 done: approve/reject, for a friend, pickups, pickup log (#8).
+- **Nov 11:** Evan: sort, brand in search, time counter on cards, hide picked-up items, photo on cards, shareable searches, possible matches for lost reports.
+- **Nov 18:** security fix: `escapeHtml()` now also escapes quotes, so text a student types (e.g. a friend's name) can't run as code in an employee's browser (#9). Removed a stray `public/styles.zip` backup.
 
 **The code is one page.** `index.html` has sections that the nav buttons show and hide, and
 `script.js` holds the code. This replaced the earlier idea of separate HTML pages.
@@ -100,17 +101,15 @@ If you are an AI agent working for one of the team members:
 
 | Person | Owns | Remaining focus |
 |---|---|---|
-| **Evan** | Search, item cards, lost reports, deploy setup | **Hide picked-up items** and **time counter on cards** (both needed for Nov 2), then sort, brand in search |
-| **Trevor** | Employee item tools, photos, security rules | Color dropdown, `status` on new items, edit/remove/donate, photos; review WS4 rules |
-| **Braden** | Design, locations, map | Real locations, map page, mobile fixes (`time.js` was taken over by Jaime) |
-| **Jaime** | Coordination, Firebase, login, claims & pickups | Coordination, the Nov 2 full-flow check, helping whoever is behind |
+| **Evan** | Search, item cards, lost reports, deploy setup | ✅ All tasks done. Help test, and help Trevor with photos if he asks |
+| **Trevor** | Employee item tools, photos, security rules | **Photos** and **remove items** (promised features), color dropdown, `status` on new items |
+| **Braden** | Design, locations, map | **Map** (promised feature) with the real locations, mobile fixes |
+| **Jaime** | Coordination, Firebase, login, claims & pickups | Coordination, user test, demo prep; takes over anything not done by Fri Nov 20 |
 
-**Order that matters (week 5, before the Mon Nov 2 full-flow check):**
-- **By Fri Oct 30:**
-  - **Evan:** hide picked-up/donated items from search (Jaime's pickups already set `status: "picked_up"`), and show the time counter on cards (`js/time.js` is ready).
-  - **Trevor:** `status: "available"` on new items, and the color dropdown.
-  - **Braden:** `locations.js` with the real desks (his map needs it).
-- **Mon Nov 2:** full-flow check (§5).
+**Order that matters (weeks 8–10):**
+- **Fri Nov 20:** deadline for the map (Braden) and photos + remove items (Trevor). Not pushed by then → Jaime takes them over Nov 21–22.
+- **Mon–Tue Nov 23–24:** full-flow check + mini user test (§5).
+- **Sat Nov 28:** feature freeze.
 
 ### Evan: search & item cards
 
@@ -138,10 +137,8 @@ If you are an AI agent working for one of the team members:
 - [x] **Needed for Nov 2:** hide items whose `status` is `picked_up` or `donated`. A missing status counts as available. (Recording a pickup already sets `status: "picked_up"`.)
 - [x] Cards show the item's `photo` when it has one (after Trevor adds photos), and the emoji otherwise.
 
-**Others wait on you for:** brand/color filters and sort before the week 5 full-flow check.
-**You wait on:**
-- Braden: `time.js` and `locations.js`
-- Trevor: the `status`, `brand` and `photo` fields
+**Others wait on you for:** nothing; all your tasks are done (Nov 11).
+**You wait on:** Braden's `locations.js` (the location filter still uses the made-up building list).
 
 ### Trevor: employee item tools, photos & security rules
 
@@ -156,21 +153,21 @@ If you are an AI agent working for one of the team members:
 - [x] First version of `firestore.rules`, written with Jaime in pull request #3.
 - [x] "Add sample items" button.
 
-**Week 3–4**
+**Deadline Fri Nov 20** (the first two are features we promised in our submission)
+- [ ] **Promised feature #7:** photo on the "Record Found Item" form:
+  - shrink it in the browser to about 400 px wide (JPEG, using a canvas)
+  - save it as the item's `photo` field (see §7 for why not Firebase Storage). Evan's cards already show it.
+- [ ] **Promised feature #2:** employee list of all items (new panel), with buttons:
+  - **Remove**, which also deletes its `itemSecrets` document, in one batch
+  - **Mark as donated**, which sets `status: "donated"` (search already hides donated items)
+  - **Edit** (nice to have)
+- [ ] New items get `status: "available"`.
 - [ ] "Record Found Item" form:
   - [x] add a **Brand** field. (Small fix: it's inside the Color `form-group`; give it its own `<div class="form-group">` so it has normal spacing.)
   - [ ] change **Color** to a dropdown with a fixed list (use the same colors as Evan's color filter, including Silver)
-- [ ] New items get `status: "available"`.
-- [ ] Employee list of all items (new panel), with buttons:
-  - **Edit**
-  - **Remove**, which also deletes its `itemSecrets` document, in one batch
-  - **Mark as donated**, which sets `status: "donated"`
-- [ ] Photo on the form:
-  - shrink it in the browser to about 400 px wide (JPEG, using a canvas)
-  - save it as the item's `photo` field (see §7 for why not Firebase Storage)
 - [ ] Review the rules changes in Jaime's pickups pull request.
 
-**Others wait on you for:** `status: "available"` and the color list (by Fri Oct 30).
+**Others wait on you for:** photos and remove items, for the demo. Not pushed by Fri Nov 20 → Jaime takes them over.
 **You wait on:** nothing.
 
 ### Braden: design, locations & map
@@ -181,13 +178,13 @@ If you are an AI agent working for one of the team members:
 - `styles.css` (shared with Trevor)
 - New files `public/js/locations.js`, `public/js/map.js`
 
-**Week 3–4**
+**Deadline Fri Nov 20** (the map is a feature we promised in our submission)
 - [ ] (human) Find the real lost & found desks: which buildings run one, their hours, and how long they keep items. Start with the Manwaring Center information desk. Write them in `docs/locations.md`.
-- [ ] **Early week 3, Evan and Trevor need it:** `js/locations.js`.
+- [ ] `js/locations.js` (the map and Evan's location filter need it):
   - It's a list of the desks: name, latitude/longitude, hours, and `holdDays` (how long items are kept).
   - Replace the made-up "Library / Student Union / Science Building / Gym / Business Building" options in all 3 location dropdowns with the real ones.
 - [x] `js/time.js`: **taken over and done by Jaime (Oct 28)** so Evan wasn't blocked. When `locations.js` has `holdDays` per desk, pass it as the second argument of `timeCounterText` / `daysLeft`.
-- [ ] Map page:
+- [ ] **Promised feature #4:** Map page:
   - add a **Map** nav button and a `#map` section
   - use Leaflet + OpenStreetMap, loaded from their links
   - each desk gets a marker showing its hours and number of items
@@ -196,7 +193,7 @@ If you are an AI agent working for one of the team members:
 - [ ] Check every section at phone width (375 px).
 - [ ] When this is done, help Evan or Trevor, whoever is behind. (WS4 is done.)
 
-**Others wait on you for:** `locations.js` (real desks for the location filters and the map, by Fri Oct 30).
+**Others wait on you for:** the map and `locations.js`, for the demo. Not pushed by Fri Nov 20 → Jaime takes them over.
 **You wait on:** nothing.
 
 ### Jaime: coordination, login, claims & pickups
@@ -230,10 +227,19 @@ If you are an AI agent working for one of the team members:
   - save a `pickups` document, set the item's `status` to `picked_up`, and set the claim to `"Picked up"`, all in one batch (other open claims for the item are rejected in the same batch)
 - [x] Pickup log panel for employees: every pickup, newest first. It can't be edited or deleted from the website.
 - [x] Rules for `pickups` and the claim updates (Trevor reviews).
-- [ ] (human) Run the full-flow check with the team on **Mon Nov 2** (§5).
+- [x] Security fix: `escapeHtml()` escapes quotes too (#9).
 
-**Others wait on you for:** nothing right now.
-**You wait on:** Evan (hide picked-up items, time counter on cards) for the full-flow check.
+**Weeks 8–10**
+- [ ] Deploy (`firebase deploy` from `main`) so Evan's Nov 11 work and the security fix go live.
+- [ ] (human) Message Braden and Trevor: deadline Fri Nov 20 for the map, photos and remove items.
+- [ ] If they're not pushed by Fri Nov 20: take them over on Nov 21–22.
+- [ ] (human) Full-flow check with the team + mini user test with 3 friends on their phones (Mon–Tue Nov 23–24, §5). Write down what confuses them.
+- [ ] Fix the top 2–3 problems from the test (Wed Nov 25).
+- [ ] Optional: a short privacy note in the footer (what we store: Google name and email, claims, pickups).
+- [ ] Demo prep: clean the live data (replace the 4 old-format test items with a few real-looking ones with photos; delete test claims), write the demo script, rehearse.
+
+**Others wait on you for:** the deploy.
+**You wait on:** Braden (map) and Trevor (photos, remove items) until Fri Nov 20.
 
 ---
 
@@ -249,13 +255,13 @@ who took an item home. This app:
 
 | # | Feature (from our submission) | Owner | Status |
 |---|---|---|---|
-| 1 | Search and filter by type, color, brand and location | Evan | 🟡 Text, category, color and location work; brand in search and sort to do |
-| 2 | Employees can add and remove items | Trevor | 🟡 Adding works (with brand); edit/remove/donate to do |
-| 3 | Time counter: how long an item has been there, and days left before it's donated | Jaime (helpers) + Evan (cards) | 🟡 Helpers done (`js/time.js`); showing it on the cards to do |
-| 4 | Map of lost & found locations | Braden | 🔴 To do |
-| 5 | Request an item for a friend | Jaime | ✅ Done (WS4 pull request) |
-| 6 | Record of who picked the item up | Jaime | ✅ Done: Record Pickup + Pickup Log (WS4 pull request) |
-| 7 | Post a picture of each item | Trevor | 🔴 To do |
+| 1 | Search and filter by type, color, brand and location | Evan | ✅ Done (text, brand, category, color, location, sort) |
+| 2 | Employees can add and remove items | Trevor | 🟡 Adding works (with brand); **removing items to do (deadline Fri Nov 20)** |
+| 3 | Time counter: how long an item has been there, and days left before it's donated | Jaime (helpers) + Evan (cards) | ✅ Done |
+| 4 | Map of lost & found locations | Braden | 🔴 **To do (deadline Fri Nov 20)** |
+| 5 | Request an item for a friend | Jaime | ✅ Done |
+| 6 | Record of who picked the item up | Jaime | ✅ Done: Record Pickup + Pickup Log |
+| 7 | Post a picture of each item | Trevor | 🟡 Cards show photos; **adding a photo to an item to do (deadline Fri Nov 20)** |
 | + | Lost reports (students describe what they lost) | Evan | ✅ Done |
 | + | Private details only employees see, shown next to claims | Jaime | ✅ Done |
 
@@ -354,12 +360,11 @@ Assumes a final demo the week of Nov 30, 2026. Adjust the dates to the course ca
 | 1–2 | Sep 28 – Oct 9 | Setup: Firebase, live site, first front end | ✅ Done |
 | 3 | Oct 12–16 | Database connection, security rules, employee login | ✅ Done |
 | 4 | Oct 19–23 | Features: color filter, brand, Google sign-in + My Requests | ✅ Done (map, photos, edit/remove still open) |
-| 5 | Oct 26–30 | WS4 done (for a friend, approve/reject, pickups, pickup log) + `time.js`. By Fri: hide picked-up items, time counter on cards, `status`, color dropdown, `locations.js` | 👉 **We are here** |
-| 6 | **Mon Nov 2** | **Full-flow check** (moved from Oct 26): employee adds an item → student finds it → requests it for a friend → employee approves → friend picks it up → it shows in the pickup log and disappears from search. Then: phone layout, loading/empty/error messages, real location data, map, photos | |
-| 7 | Nov 9 | One optional extra per person (§8) | |
-| 8 | Nov 16 | Test with 3–5 real students on the live site | |
-| 9 | Nov 23 | Fix the top feedback (short week, Thanksgiving) | |
-| 10 | Nov 30 | No new features 48 hours before the demo; rehearse it | |
+| 5 | Oct 26–30 | WS4 done (for a friend, approve/reject, pickups, pickup log) + `time.js` | ✅ Done |
+| 6–7 | Nov 2–13 | Evan: sort, brand, time counter on cards, hide picked-up items, shareable searches, possible matches | ✅ Done (map, photos, remove items still open) |
+| 8 | Nov 16–20 | Security fix + deploy. **Fri Nov 20: deadline for map, photos, remove items** | 👉 **We are here** |
+| 9 | Nov 21–27 | Nov 21–22: take over anything missing. **Mon–Tue Nov 23–24: full-flow check** (employee adds an item with a photo → student finds it → requests it for a friend → employee approves → friend picks it up → it shows in the pickup log and disappears from search) **+ mini user test** with 3 friends on phones. Wed Nov 25: fix the top problems. (Thanksgiving) | |
+| 10 | Nov 28 – Dec 4 | **Sat Nov 28: feature freeze.** Clean the live data, write the demo script, rehearse. Final demo | |
 
 **Weekly routine:** short written check-ins Mon/Wed/Fri (done / next / blocked), one 30-minute
 call a week to try the live site together, and pull request reviews within 24 hours.
@@ -399,7 +404,7 @@ call a week to try the live site together, and pull request reviews within 24 ho
 
 ## 8. Optional extras (week 7+)
 
-- **Evan:** keep the filters in the page address; show employees possible matches between lost reports and found items
+- **Evan:** ✅ keep the filters in the page address; ✅ show employees possible matches between lost reports and found items
 - **Trevor:** a "donate all expired items" button
 - **Braden:** "open now" badge on each location; a walking-directions link; an employee page to edit locations
 - **Jaime:** a badge showing how many claims are waiting for review; Firebase App Check
