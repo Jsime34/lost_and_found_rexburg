@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rexburg Lost &amp; Found</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
         .item-image img { width: 100%; height: 100%; object-fit: cover; }
@@ -22,9 +24,25 @@
         <nav>
             <button class="nav-btn active" data-page="home">Home</button>
             <button class="nav-btn" data-page="browse">Found Items</button>
+            <button class="nav-btn" data-page="map">Map</button>
             <button class="nav-btn" data-page="lost">Report Lost Item</button>
+            <button class="nav-btn" data-page="requests">My Requests</button>
             <button class="nav-btn" data-page="admin">Employees</button>
         </nav>
+
+        <!-- STUDENT SIGN IN (Google). script.js shows one or the other. -->
+        <div class="auth-area">
+            <button id="googleSignInBtn" type="button" class="google-btn">
+                Sign in with Google
+            </button>
+
+            <div id="signedInBox" class="signed-in-box hidden">
+                <span>Hi, <strong id="signedInName"></strong></span>
+                <button id="signOutBtn" type="button" class="sign-out-btn">
+                    Sign out
+                </button>
+            </div>
+        </div>
     </header>
 
     <main>
@@ -113,6 +131,20 @@
 
 
         <!-- =========================
+             LOST & FOUND MAP
+        ========================== -->
+        <section id="map" class="page">
+            <div class="page-title">
+                <span class="eyebrow">LOCATIONS</span>
+                <h2>Lost &amp; Found Map</h2>
+                <p>Find the campus office and its current hours.</p>
+            </div>
+            <div id="locationMap" class="location-map"></div>
+            <div id="locationCards" class="location-card-grid"></div>
+        </section>
+
+
+        <!-- =========================
              BROWSE FOUND ITEMS
         ========================== -->
         <section id="browse" class="page">
@@ -149,11 +181,11 @@
                 </select>
                 <select id="locationFilter">
                     <option value="all">All Locations</option>
-                    <option value="Library">Library</option>
-                    <option value="Student Union">Student Union</option>
-                    <option value="Science Building">Science Building</option>
-                    <option value="Gym">Gym</option>
-                    <option value="Business Building">Business Building</option>
+                    <option value="Rigby Hall">Rigby Hall</option>
+                </select>
+                <select id="sortOrder">
+                    <option value="newest">Newest first</option>
+                    <option value="oldest">Oldest first</option>
                 </select>
             </div>
             <p id="resultsText" class="results-text"></p>
@@ -230,11 +262,7 @@
 
                             <select id="lostLocation" required>
                                 <option value="">Choose location</option>
-                                <option>Library</option>
-                                <option>Student Union</option>
-                                <option>Science Building</option>
-                                <option>Gym</option>
-                                <option>Business Building</option>
+                                <option>Rigby Hall</option>
                             </select>
                         </div>
 
@@ -317,6 +345,35 @@
                 </div>
 
             </div>
+
+        </section>
+
+
+        <!-- =========================
+             MY REQUESTS (signed-in students)
+        ========================== -->
+        <section id="requests" class="page">
+
+            <div class="page-title">
+                <span class="eyebrow">YOUR CLAIMS</span>
+                <h2>My Requests</h2>
+                <p>
+                    Items you've claimed, and where each request stands.
+                </p>
+            </div>
+
+            <!-- Shown while nobody is signed in -->
+            <div id="requestsSignIn" class="report-card">
+                <p>
+                    Sign in with your Google account to see your requests.
+                </p>
+
+                <button id="requestsSignInBtn" type="button" class="primary-btn">
+                    Sign in with Google
+                </button>
+            </div>
+
+            <div id="myRequests" class="item-grid hidden"></div>
 
         </section>
 
@@ -452,11 +509,7 @@
 
                             <select id="foundLocation" required>
                                 <option value="">Choose location</option>
-                                <option>Library</option>
-                                <option>Student Union</option>
-                                <option>Science Building</option>
-                                <option>Gym</option>
-                                <option>Business Building</option>
+                                <option>Rigby Hall</option>
                             </select>
                         </div>
 
@@ -519,10 +572,26 @@
 
                     <p class="panel-note">
                         Compare what the student says with the private details
-                        on file before giving the item back.
+                        on file. Approve it, then record the pickup at the desk
+                        after checking a photo ID.
                     </p>
 
                     <div id="adminClaims"></div>
+
+                </div>
+
+
+                <!-- PICKUP LOG (feature 6: who took each item home) -->
+                <div class="admin-panel wide-panel">
+
+                    <h3>Pickup Log</h3>
+
+                    <p class="panel-note">
+                        Who took each item home and which employee handed it
+                        over. This log can't be edited or deleted from the website.
+                    </p>
+
+                    <div id="adminPickups"></div>
 
                 </div>
 
@@ -554,26 +623,29 @@
             </p>
 
 
+            <!-- Shown when the student isn't signed in yet -->
+            <div id="claimSignIn" class="report-card hidden">
+                <p>
+                    To claim an item, sign in with your Google account.
+                    We'll use its email to contact you.
+                </p>
+
+                <button id="claimSignInBtn" type="button" class="primary-btn">
+                    Sign in with Google
+                </button>
+            </div>
+
+
             <form id="claimForm">
 
                 <input type="hidden" id="claimItemId">
 
 
-                <div class="form-group">
-
-                    <label for="claimEmail">
-                        University Email
-                    </label>
-
-                    <input
-                        id="claimEmail"
-                        maxlength="200"
-                        type="email"
-                        placeholder="student@university.edu"
-                        required
-                    >
-
-                </div>
+                <!-- The email comes from the student's Google account, so
+                     nobody can send a claim in someone else's name. -->
+                <p class="claim-as">
+                    Claiming as <strong id="claimUserEmail"></strong>
+                </p>
 
 
                 <div class="form-group">
@@ -593,6 +665,40 @@
                 </div>
 
 
+                <!-- "Request an item for a friend" (feature 5) -->
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="claimForFriend">
+                        I'm asking for a friend (they'll pick it up)
+                    </label>
+                </div>
+
+                <div id="friendFields" class="hidden">
+
+                    <div class="form-group">
+                        <label for="claimFriendName">Friend's name</label>
+                        <input
+                            id="claimFriendName"
+                            type="text"
+                            maxlength="80"
+                            placeholder="Who will pick it up?"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="claimFriendContact">
+                            Friend's email or phone (optional)
+                        </label>
+                        <input
+                            id="claimFriendContact"
+                            type="text"
+                            maxlength="120"
+                        >
+                    </div>
+
+                </div>
+
+
                 <button type="submit" class="primary-btn">
                     Submit Claim
                 </button>
@@ -608,6 +714,7 @@
                     <h3>Claim submitted!</h3>
                     <p>
                         A Lost & Found employee will review your information.
+                        You can check its status under <strong>My Requests</strong>.
                     </p>
                 </div>
 

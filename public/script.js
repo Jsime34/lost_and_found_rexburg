@@ -7,7 +7,8 @@
 //
 // Who can read what is decided by the security rules in firestore.rules:
 //   - everyone can see found items (but not their private details)
-//   - only logged-in employees can see private details, lost reports and claims
+//   - signed-in students can send claims and see their own claims
+//   - only logged-in employees can see private details, lost reports and all claims
 import {
     db,
     auth,
@@ -17,14 +18,32 @@ import {
     getDocs,
     addDoc,
     query,
+    where,
     orderBy,
     serverTimestamp,
     Timestamp,
     writeBatch,
     onAuthStateChanged,
     signInWithEmailAndPassword,
-    signOut
+    signOut,
+    GoogleAuthProvider,
+    signInWithPopup
 } from "./js/firebase.js";
+
+// Employee actions on claims: approve, reject, record pickup (WS4).
+import {
+    PENDING,
+    APPROVED,
+    approveClaim,
+    rejectClaim,
+    recordPickup,
+    loadPickups
+} from "./js/pickups.js";
+
+// Time counter shown on each found-item card.
+import { timeCounterText } from "./js/time.js";
+import { LOCATIONS, getLocationHoldDays } from "./js/locations.js";
+import { initLocationMap } from "./js/map.js";
 
 
 // Public data (everyone). Filled in by loadEverything().
@@ -34,6 +53,13 @@ let foundItems = [];
 let lostReports = [];
 let claims = [];
 let itemSecrets = {};   // private details of each found item, by item id
+let pickups = [];       // who took each item home (pickup log)
+
+// The signed-in account (a student with Google, or an employee), or null.
+let currentUser = null;
+
+// The signed-in student's own claims. Filled in by loadMyRequests().
+let myClaims = [];
 
 // The logged-in employee ({ name, email }), or null for visitors.
 let currentEmployee = null;
@@ -50,7 +76,7 @@ const sampleItems = [
         name: "Black Backpack",
         category: "Bags",
         color: "Black",
-        location: "Library",
+        location: "Rigby Hall",
         foundOn: "2026-09-29",
         description: "Black backpack found near the second-floor study area.",
         privateDetails: "Contains a Dell laptop with a Star Wars sticker.",
@@ -61,7 +87,7 @@ const sampleItems = [
         name: "Wireless Earbuds",
         category: "Electronics",
         color: "White",
-        location: "Gym",
+        location: "Rigby Hall",
         foundOn: "2026-09-30",
         description: "Wireless earbuds found near the basketball courts.",
         privateDetails: "Case has initials written underneath.",
@@ -72,7 +98,7 @@ const sampleItems = [
         name: "Car Keys",
         category: "Keys",
         color: "Black",
-        location: "Student Union",
+        location: "Rigby Hall",
         foundOn: "2026-09-30",
         description: "Set of vehicle keys found near the food court.",
         privateDetails: "Specific vehicle manufacturer and unique keychain.",
@@ -83,7 +109,7 @@ const sampleItems = [
         name: "Water Bottle",
         category: "Other",
         color: "Blue",
-        location: "Science Building",
+        location: "Rigby Hall",
         foundOn: "2026-09-28",
         description: "Blue insulated water bottle found in a classroom.",
         privateDetails: "Several specific stickers are attached.",
@@ -94,7 +120,7 @@ const sampleItems = [
         name: "Gray Hoodie",
         category: "Clothing",
         color: "Gray",
-        location: "Library",
+        location: "Rigby Hall",
         foundOn: "2026-09-27",
         description: "Gray hoodie found on a chair near the entrance.",
         privateDetails: "Specific university logo and size.",
@@ -105,7 +131,7 @@ const sampleItems = [
         name: "Smartphone",
         category: "Electronics",
         color: "Black",
-        location: "Business Building",
+        location: "Rigby Hall",
         foundOn: "2026-09-30",
         description: "Black smartphone found in a classroom.",
         privateDetails: "Cracked corner and unique lock-screen image.",
@@ -121,13 +147,16 @@ const sampleItems = [
 // Makes text safe to put inside HTML. Anyone can type into our forms, so
 // without this someone could type HTML (or a <script>) and it would run
 // on other people's screens.
+// Quotes are escaped too, because some text goes inside attributes like
+// value="..." (a " in someone's text would otherwise end the attribute early).
 function escapeHtml(text) {
 
-    const div = document.createElement("div");
-
-    div.textContent = text ?? "";
-
-    return div.innerHTML;
+    return String(text ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
 }
 
 
@@ -186,9 +215,12 @@ function normalizeItem(item) {
         name: String(item.name || item.title || "Unnamed item"),
         category: String(item.category || item.type || "Other"),
         color: String(item.color || "Unknown"),
+        brand: String(item.brand || ""),
         location: String(item.location || item.locationName || item.foundWhere || "Unknown"),
         description: String(item.description || "No description provided."),
-        icon: String(item.icon || "📦")
+        icon: String(item.icon || "📦"),
+        photo: String(item.photo || ""),
+        status: String(item.status || "available").toLowerCase()
     };
 }
 
@@ -239,10 +271,14 @@ async function loadFoundItems() {
     // of the project.
     foundItems = (await loadCollection("items"))
         .map(normalizeItem)
+        .filter(function(item) {
+            return item.status !== "picked_up" && item.status !== "donated";
+        })
         .sort(function(first, second) {
             return dateToMillis(second.foundAt) - dateToMillis(first.foundAt);
         });
 
+    loadFiltersFromUrl();
     filterItems();
 
     displayRecentItems();
@@ -283,16 +319,26 @@ async function loadClaims() {
 }
 
 
+async function loadPickupLog() {
+
+    pickups = await loadPickups();
+
+    displayPickups();
+}
+
+
 async function loadEmployeeData() {
 
     showMessage("adminLostReports", "Loading lost reports...");
     showMessage("adminClaims", "Loading claims...");
+    showMessage("adminPickups", "Loading pickups...");
 
     try {
 
         await loadItemSecrets();
         await loadLostReports();
         await loadClaims();
+        await loadPickupLog();
 
     } catch (error) {
 
@@ -306,6 +352,11 @@ async function loadEmployeeData() {
         showMessage(
             "adminClaims",
             "Couldn't load claims. Refresh the page to try again."
+        );
+
+        showMessage(
+            "adminPickups",
+            "Couldn't load the pickup log. Refresh the page to try again."
         );
     }
 }
@@ -369,6 +420,11 @@ function showPage(pageId) {
 
 
     window.scrollTo(0, 0);
+
+    if (pageId === "map") {
+        initLocationMap(foundItems, showItemsAtLocation);
+        displayLocationCards();
+    }
 }
 
 
@@ -426,11 +482,19 @@ function getIcon(category) {
 
 function createItemCard(item) {
 
+    const timeText = timeCounterText(
+        item.foundAt,
+        getLocationHoldDays(item.location)
+    );
+    const itemVisual = item.photo
+        ? `<img src="${escapeHtml(item.photo)}" alt="Photo of ${escapeHtml(item.name)}">`
+        : escapeHtml(item.icon);
+
     return `
         <div class="item-card">
 
             <div class="item-image">
-                ${escapeHtml(item.icon)}
+                ${itemVisual}
             </div>
 
             <div class="item-info">
@@ -453,6 +517,11 @@ function createItemCard(item) {
                     </p>
 
                     <p>
+                        <strong>Brand:</strong>
+                        ${escapeHtml(item.brand || "Not listed")}
+                    </p>
+
+                    <p>
                         <strong>📍 Found:</strong>
                         ${escapeHtml(item.location)}
                     </p>
@@ -461,6 +530,13 @@ function createItemCard(item) {
                         <strong>📅 Date:</strong>
                         ${escapeHtml(formatDate(item.foundAt))}
                     </p>
+
+                    ${timeText ? `
+                    <p>
+                        <strong>⏱ Time:</strong>
+                        ${escapeHtml(timeText)}
+                    </p>
+                    ` : ""}
 
                 </div>
 
@@ -567,6 +643,9 @@ const colorFilter =
 const locationFilter =
     document.getElementById("locationFilter");
 
+const sortOrder =
+    document.getElementById("sortOrder");
+
 
 function filterItems() {
 
@@ -589,7 +668,8 @@ function filterItems() {
             const matchesSearch =
                 item.name.toLowerCase().includes(search) ||
                 item.description.toLowerCase().includes(search) ||
-                item.color.toLowerCase().includes(search);
+                item.color.toLowerCase().includes(search) ||
+                item.brand.toLowerCase().includes(search);
 
             const matchesCategory =
                 category === "all" ||
@@ -615,12 +695,45 @@ function filterItems() {
 
         });
 
+    const searchParams = new URLSearchParams();
+
+    if (search) searchParams.set("q", searchInput.value.trim());
+    if (category !== "all") searchParams.set("category", category);
+    if (color !== "all") searchParams.set("color", color);
+    if (location !== "all") searchParams.set("location", location);
+    if (sortOrder.value !== "newest") searchParams.set("sort", sortOrder.value);
+
+    const queryText = searchParams.toString();
+    const newUrl = window.location.pathname + (queryText ? "?" + queryText : "") + window.location.hash;
+    window.history.replaceState({}, "", newUrl);
+
+    filtered.sort(function(first, second) {
+        const difference =
+            dateToMillis(second.foundAt) - dateToMillis(first.foundAt);
+
+        return sortOrder.value === "oldest"
+            ? -difference
+            : difference;
+    });
+
 
     document.getElementById("resultsText").textContent =
         filtered.length + " item(s) found";
 
 
     displayFoundItems(filtered);
+}
+
+
+function loadFiltersFromUrl() {
+
+    const searchParams = new URLSearchParams(window.location.search);
+
+    searchInput.value = searchParams.get("q") || "";
+    categoryFilter.value = searchParams.get("category") || "all";
+    colorFilter.value = searchParams.get("color") || "all";
+    locationFilter.value = searchParams.get("location") || "all";
+    sortOrder.value = searchParams.get("sort") === "oldest" ? "oldest" : "newest";
 }
 
 
@@ -644,6 +757,11 @@ colorFilter.addEventListener(
     filterItems
 );
 
+sortOrder.addEventListener(
+    "change",
+    filterItems
+);
+
 
 // ==========================================
 // CLAIM MODAL
@@ -657,6 +775,60 @@ const closeModal =
 
 const claimForm =
     document.getElementById("claimForm");
+
+const claimSignIn =
+    document.getElementById("claimSignIn");
+
+
+// Students must be signed in (with Google) to claim an item.
+// Shows the "Sign in with Google" box or the claim form.
+function updateClaimModal() {
+
+    if (currentUser) {
+
+        document.getElementById("claimUserEmail").textContent =
+            currentUser.email;
+
+        claimSignIn.classList.add("hidden");
+        claimForm.classList.remove("hidden");
+
+    } else {
+
+        claimSignIn.classList.remove("hidden");
+        claimForm.classList.add("hidden");
+    }
+}
+
+
+document.getElementById("claimSignInBtn").addEventListener(
+    "click",
+    function() {
+        signInWithGoogle();
+        // onAuthStateChanged (at the bottom) swaps in the claim form.
+    }
+);
+
+
+// "I'm asking for a friend" checkbox: shows the friend's name and contact
+// fields, and makes the name required.
+const claimForFriend =
+    document.getElementById("claimForFriend");
+
+function updateFriendFields() {
+
+    const friendFields = document.getElementById("friendFields");
+    const friendName = document.getElementById("claimFriendName");
+
+    if (claimForFriend.checked) {
+        friendFields.classList.remove("hidden");
+        friendName.required = true;
+    } else {
+        friendFields.classList.add("hidden");
+        friendName.required = false;
+    }
+}
+
+claimForFriend.addEventListener("change", updateFriendFields);
 
 
 function addClaimButtonEvents() {
@@ -683,6 +855,11 @@ function addClaimButtonEvents() {
                     );
 
 
+                // Start each claim with an empty form.
+                claimForm.reset();
+                updateFriendFields();
+
+
                 document.getElementById(
                     "claimItemId"
                 ).value = item.id;
@@ -694,11 +871,12 @@ function addClaimButtonEvents() {
                     "Claim: " + item.name;
 
 
-                claimForm.classList.remove("hidden");
-
                 document.getElementById(
                     "claimSuccess"
                 ).classList.add("hidden");
+
+                // Sign-in box or claim form, depending on who's signed in.
+                updateClaimModal();
 
 
                 claimModal.classList.remove("hidden");
@@ -742,6 +920,13 @@ claimForm.addEventListener(
         event.preventDefault();
 
 
+        // Signed out while the popup was open? Show the sign-in box again.
+        if (!currentUser) {
+            updateClaimModal();
+            return;
+        }
+
+
         const itemId =
             document.getElementById(
                 "claimItemId"
@@ -759,19 +944,34 @@ claimForm.addEventListener(
 
             itemId: itemId,
 
-            itemName: item.name,
+            itemName: item.name.slice(0, 100),
 
-            email:
-                document.getElementById(
-                    "claimEmail"
-                ).value,
+            // Who sent it. The security rules check these match the
+            // signed-in account, so nobody can claim in someone else's name.
+            userId: currentUser.uid,
+
+            userName: (currentUser.displayName || currentUser.email).slice(0, 100),
+
+            email: currentUser.email,
 
             verification:
                 document.getElementById(
                     "claimDescription"
                 ).value,
 
-            status: "Pending",
+            // "Request for a friend": the friend picks it up at the desk.
+            // Empty text when it's not for a friend (the rules check this).
+            forFriend: claimForFriend.checked,
+
+            friendName: claimForFriend.checked
+                ? document.getElementById("claimFriendName").value.trim()
+                : "",
+
+            friendContact: claimForFriend.checked
+                ? document.getElementById("claimFriendContact").value.trim()
+                : "",
+
+            status: PENDING,
 
             createdAt: serverTimestamp()
 
@@ -789,6 +989,7 @@ claimForm.addEventListener(
             await addDoc(collection(db, "claims"), newClaim);
 
             claimForm.reset();
+            updateFriendFields();
 
             claimForm.classList.add("hidden");
 
@@ -796,7 +997,10 @@ claimForm.addEventListener(
                 "claimSuccess"
             ).classList.remove("hidden");
 
-            // Only employees are allowed to read claims.
+            // Show it in My Requests right away.
+            await loadMyRequests();
+
+            // Only employees are allowed to read everyone's claims.
             if (currentEmployee) {
                 await loadClaims();
             }
@@ -805,7 +1009,12 @@ claimForm.addEventListener(
 
             console.error(error);
 
-            alert("Sorry, your claim couldn't be saved. Please try again.");
+            // The rules refuse claims on items already picked up or donated.
+            if (error.code === "permission-denied") {
+                alert("This item may no longer be in the lost & found. Refresh the page to see the latest list.");
+            } else {
+                alert("Sorry, your claim couldn't be saved. Please try again.");
+            }
 
         } finally {
 
@@ -1110,6 +1319,63 @@ sampleDataBtn.addEventListener(
 // DISPLAY LOST REPORTS FOR EMPLOYEES
 // ==========================================
 
+function possibleMatchesForReport(report) {
+
+    const reportWords = (String(report.name || "") + " " + String(report.description || ""))
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(function(word) {
+            return word.length > 2;
+        });
+
+    return foundItems.map(function(item) {
+
+        const itemWords = (
+            item.name + " " + item.description + " " + item.brand
+        ).toLowerCase();
+
+        let score = 0;
+
+        if (item.category.toLowerCase() === String(report.category || "").toLowerCase()) {
+            score += 3;
+        }
+
+        if (item.color.toLowerCase() === String(report.color || "").toLowerCase()) {
+            score += 2;
+        }
+
+        reportWords.forEach(function(word) {
+            if (itemWords.includes(word)) score += 1;
+        });
+
+        return { item: item, score: score };
+
+    }).filter(function(match) {
+        return match.score > 0;
+    }).sort(function(first, second) {
+        return second.score - first.score;
+    }).slice(0, 3);
+}
+
+
+function possibleMatchesHtml(report) {
+
+    const matches = possibleMatchesForReport(report);
+
+    if (matches.length === 0) {
+        return "<p><strong>Possible matches:</strong> None yet</p>";
+    }
+
+    return `
+        <p><strong>Possible matches:</strong></p>
+        <ul>
+            ${matches.map(function(match) {
+                return `<li>${escapeHtml(match.item.name)} at ${escapeHtml(match.item.location)}</li>`;
+            }).join("")}
+        </ul>
+    `;
+}
+
 function displayLostReports() {
 
     const container =
@@ -1173,6 +1439,8 @@ function displayLostReports() {
                         ${escapeHtml(report.privateDetails)}
                     </p>
 
+                    ${possibleMatchesHtml(report)}
+
                 </div>
 
             `;
@@ -1185,6 +1453,89 @@ function displayLostReports() {
 // ==========================================
 // DISPLAY CLAIMS FOR EMPLOYEES
 // ==========================================
+
+// The colored label for a claim status, e.g. "Picked up" → status-picked-up
+// (colors are in styles.css). Also used by My Requests.
+function statusBadge(status) {
+
+    const statusClass =
+        "status-" + String(status).toLowerCase().replace(/\s+/g, "-");
+
+    return `
+        <span class="status-badge ${escapeHtml(statusClass)}">
+            ${escapeHtml(status)}
+        </span>
+    `;
+}
+
+
+// Buttons for the next step of a claim:
+//   Pending  → note + Approve / Reject
+//   Approved → who's picking it up + last 4 of ID → Record Pickup (or Reject)
+//   Rejected / Picked up → nothing left to do
+function claimActions(claim) {
+
+    if (claim.status === PENDING) {
+
+        return `
+            <div class="claim-actions">
+                <input
+                    id="note-${escapeHtml(claim.id)}"
+                    type="text"
+                    maxlength="300"
+                    placeholder="Note for the student (optional)"
+                >
+                <div class="action-buttons">
+                    <button class="primary-btn" data-action="approve" data-claim-id="${escapeHtml(claim.id)}">
+                        Approve
+                    </button>
+                    <button class="secondary-btn" data-action="reject" data-claim-id="${escapeHtml(claim.id)}">
+                        Reject
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    if (claim.status === APPROVED) {
+
+        // Usually the student picks it up; for a friend request, the friend.
+        const expectedPerson =
+            claim.forFriend ? claim.friendName : (claim.userName || "");
+
+        return `
+            <div class="claim-actions">
+                <p class="panel-note">
+                    At the desk: check their photo ID, then record the pickup.
+                </p>
+                <input
+                    id="pickupName-${escapeHtml(claim.id)}"
+                    type="text"
+                    maxlength="80"
+                    value="${escapeHtml(expectedPerson)}"
+                    placeholder="Name of the person picking it up"
+                >
+                <input
+                    id="pickupId-${escapeHtml(claim.id)}"
+                    type="text"
+                    maxlength="4"
+                    placeholder="Last 4 characters of their photo ID"
+                >
+                <div class="action-buttons">
+                    <button class="primary-btn" data-action="pickup" data-claim-id="${escapeHtml(claim.id)}">
+                        Record Pickup
+                    </button>
+                    <button class="secondary-btn" data-action="reject" data-claim-id="${escapeHtml(claim.id)}">
+                        Reject
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    return "";
+}
+
 
 function displayClaims() {
 
@@ -1209,28 +1560,47 @@ function displayClaims() {
     }
 
 
-    // claims is already sorted newest first.
-    claims.forEach(function(claim) {
+    // Claims that still need work first (Pending, then Approved), then the
+    // finished ones. Inside each group, newest first (claims is already).
+    const order = { [PENDING]: 0, [APPROVED]: 1 };
+
+    const sorted =
+        claims.slice().sort(function(first, second) {
+            return (order[first.status] ?? 2) - (order[second.status] ?? 2);
+        });
+
+
+    sorted.forEach(function(claim) {
 
         // What we know about the item but never showed the public.
         const privateDetails =
             itemSecrets[claim.itemId] || "No private details on file.";
 
+        const friendLine = claim.forFriend
+            ? `<p>
+                   <strong>For a friend:</strong>
+                   ${escapeHtml(claim.friendName)}${claim.friendContact ? " (" + escapeHtml(claim.friendContact) + ")" : ""}
+               </p>`
+            : "";
+
+        const noteLine = claim.adminNote
+            ? `<p><strong>Note:</strong> ${escapeHtml(claim.adminNote)}</p>`
+            : "";
+
         container.innerHTML += `
 
             <div class="report-card">
 
+                ${statusBadge(claim.status)}
+
                 <h4>${escapeHtml(claim.itemName)}</h4>
 
                 <p>
-                    <strong>Status:</strong>
-                    ${escapeHtml(claim.status)}
+                    <strong>Student:</strong>
+                    ${escapeHtml(claim.userName ? claim.userName + " (" + claim.email + ")" : claim.email)}
                 </p>
 
-                <p>
-                    <strong>Student:</strong>
-                    ${escapeHtml(claim.email)}
-                </p>
+                ${friendLine}
 
                 <p>
                     <strong>Sent:</strong>
@@ -1246,6 +1616,183 @@ function displayClaims() {
                     🔒
                     <strong>Private details on file:</strong>
                     ${escapeHtml(privateDetails)}
+                </p>
+
+                ${noteLine}
+
+                ${claimActions(claim)}
+
+            </div>
+
+        `;
+
+    });
+
+}
+
+
+// One click listener for every claim button (Approve, Reject, Record Pickup).
+// The cards are redrawn often, so we listen on the list instead of on each
+// button, and read which claim from the button's data-claim-id.
+document.getElementById("adminClaims").addEventListener(
+    "click",
+    async function(event) {
+
+        const button = event.target.closest("button[data-action]");
+
+        if (!button || !currentEmployee) {
+            return;
+        }
+
+
+        const claimId = button.dataset.claimId;
+
+        const claim =
+            claims.find(function(c) {
+                return c.id === claimId;
+            });
+
+        if (!claim) {
+            return;
+        }
+
+
+        const noteInput = document.getElementById("note-" + claimId);
+        const note = noteInput ? noteInput.value.trim() : "";
+
+        button.disabled = true;
+
+
+        try {
+
+            if (button.dataset.action === "approve") {
+
+                await approveClaim(claimId, currentEmployee.email, note);
+
+            } else if (button.dataset.action === "reject") {
+
+                if (!confirm("Reject this claim for " + claim.itemName + "?")) {
+                    button.disabled = false;
+                    return;
+                }
+
+                await rejectClaim(claimId, currentEmployee.email, note);
+
+            } else if (button.dataset.action === "pickup") {
+
+                const pickedUpBy =
+                    document.getElementById("pickupName-" + claimId).value.trim();
+
+                const idLast4 =
+                    document.getElementById("pickupId-" + claimId).value.trim().toUpperCase();
+
+                if (pickedUpBy.length < 2) {
+                    alert("Enter the name of the person picking up the item.");
+                    button.disabled = false;
+                    return;
+                }
+
+                // Only the LAST 4 characters, never a full ID number (privacy).
+                if (!/^[0-9A-Z]{4}$/.test(idLast4)) {
+                    alert("Enter exactly 4 letters or numbers: the last 4 characters of their photo ID.");
+                    button.disabled = false;
+                    return;
+                }
+
+                // Any other open claims for the same item get rejected.
+                const otherOpenClaims =
+                    claims.filter(function(c) {
+                        return c.itemId === claim.itemId &&
+                            c.id !== claim.id &&
+                            (c.status === PENDING || c.status === APPROVED);
+                    });
+
+                await recordPickup(
+                    claim,
+                    otherOpenClaims,
+                    pickedUpBy,
+                    idLast4,
+                    currentEmployee.email
+                );
+
+                // The item is no longer in the lost & found.
+                await loadFoundItems();
+                await loadPickupLog();
+            }
+
+            await loadClaims();
+
+        } catch (error) {
+
+            console.error(error);
+
+            alert("Sorry, that didn't save. Please try again.");
+
+            button.disabled = false;
+        }
+
+    }
+);
+
+
+// ==========================================
+// PICKUP LOG FOR EMPLOYEES
+// ==========================================
+
+function displayPickups() {
+
+    const container =
+        document.getElementById(
+            "adminPickups"
+        );
+
+
+    container.innerHTML = "";
+
+
+    if (pickups.length === 0) {
+
+        container.innerHTML = `
+            <p>
+                No pickups recorded yet.
+            </p>
+        `;
+
+        return;
+    }
+
+
+    // pickups is already sorted newest first.
+    pickups.forEach(function(pickup) {
+
+        const claimedBy = pickup.forFriend
+            ? " (friend of " + pickup.claimedBy + ")"
+            : "";
+
+        container.innerHTML += `
+
+            <div class="report-card">
+
+                <h4>${escapeHtml(pickup.itemName)}</h4>
+
+                <p>
+                    <strong>Picked up by:</strong>
+                    ${escapeHtml(pickup.pickedUpByName + claimedBy)}
+                </p>
+
+                <p>
+                    <strong>ID (last 4):</strong>
+                    ${escapeHtml(pickup.idLast4)}
+                </p>
+
+                <p>
+                    <strong>Released by:</strong>
+                    ${escapeHtml(pickup.releasedBy)}
+                </p>
+
+                <p>
+                    <strong>When:</strong>
+                    ${escapeHtml(formatDate(pickup.pickedUpAt))}
                 </p>
 
             </div>
@@ -1293,7 +1840,292 @@ function updateStats() {
     document.getElementById(
         "placesCount"
     ).textContent = places.size;
+}
 
+
+function displayLocationCards() {
+
+    const container =
+        document.getElementById("locationCards");
+
+    if (!container) {
+        return;
+    }
+
+    container.innerHTML = LOCATIONS.map(function(location) {
+
+        const itemCount =
+            foundItems.filter(function(item) {
+                return item.location === location.name ||
+                    item.location === location.shortName;
+            }).length;
+
+        return `
+            <div class="location-card">
+                <h3>${escapeHtml(location.shortName)}</h3>
+                <p><strong>Hours:</strong> ${escapeHtml(location.hours)}</p>
+                <p><strong>Hold period:</strong> ${location.holdDays} days</p>
+                <p><strong>Items here:</strong> ${itemCount}</p>
+                <button type="button" class="primary-btn map-items-btn" data-location="${escapeHtml(location.name)}">
+                    See items here
+                </button>
+            </div>
+        `;
+    }).join("");
+
+    container.querySelectorAll(".map-items-btn").forEach(function(button) {
+        button.addEventListener("click", function() {
+            showItemsAtLocation(button.dataset.location);
+        });
+    });
+}
+
+
+function showItemsAtLocation(locationName) {
+
+    locationFilter.value = locationName;
+    filterItems();
+    showPage("browse");
+}
+
+
+// ==========================================
+// STUDENT SIGN IN (GOOGLE) + MY REQUESTS
+// ==========================================
+
+// Opens Google's sign-in window. When it works, onAuthStateChanged
+// (at the bottom of this file) updates the page.
+async function signInWithGoogle() {
+
+    try {
+
+        await signInWithPopup(auth, new GoogleAuthProvider());
+
+    } catch (error) {
+
+        // The student closed the window: nothing to report.
+        if (error.code === "auth/popup-closed-by-user" ||
+            error.code === "auth/cancelled-popup-request") {
+            return;
+        }
+
+        console.error(error);
+
+        if (error.code === "auth/popup-blocked") {
+            alert("Your browser blocked the sign-in window. Allow pop-ups for this site and try again.");
+        } else if (error.code === "auth/operation-not-allowed") {
+            alert("Google sign-in isn't turned on for this site yet.");
+        } else if (error.code === "auth/unauthorized-domain") {
+            alert("This website address isn't allowed to sign in yet (Firebase console → Authentication → Settings → Authorized domains).");
+        } else {
+            alert("Sorry, sign-in didn't work. Please try again.");
+        }
+    }
+}
+
+
+document.getElementById("googleSignInBtn").addEventListener(
+    "click",
+    signInWithGoogle
+);
+
+document.getElementById("requestsSignInBtn").addEventListener(
+    "click",
+    signInWithGoogle
+);
+
+document.getElementById("signOutBtn").addEventListener(
+    "click",
+    function() {
+        signOut(auth);
+    }
+);
+
+
+// Header: "Sign in with Google" button, or "Hi, Name · Sign out".
+function updateAuthArea() {
+
+    const signInButton = document.getElementById("googleSignInBtn");
+    const signedInBox = document.getElementById("signedInBox");
+
+    if (currentUser) {
+
+        // First name: from the employee list, the Google account, or the
+        // part of the email before the @.
+        const fullName =
+            (currentEmployee && currentEmployee.name) ||
+            currentUser.displayName ||
+            currentUser.email.split("@")[0];
+
+        document.getElementById("signedInName").textContent =
+            fullName.split("@")[0].split(" ")[0];
+
+        signInButton.classList.add("hidden");
+        signedInBox.classList.remove("hidden");
+
+    } else {
+
+        signedInBox.classList.add("hidden");
+        signInButton.classList.remove("hidden");
+    }
+}
+
+
+// Loads only the signed-in student's claims. The security rules don't
+// let anyone read other people's claims.
+async function loadMyRequests() {
+
+    if (!currentUser) {
+        myClaims = [];
+        displayMyRequests();
+        return;
+    }
+
+    showMessage("myRequests", "Loading your requests...");
+
+    try {
+
+        const mine =
+            query(
+                collection(db, "claims"),
+                where("userId", "==", currentUser.uid)
+            );
+
+        const snapshot = await getDocs(mine);
+
+        if (snapshot.metadata.fromCache) {
+            throw new Error("Couldn't reach Firebase (offline).");
+        }
+
+        // Newest first. (Sorted here so Firebase doesn't need an extra index.)
+        myClaims = snapshot.docs
+            .map(function(doc) {
+                return { id: doc.id, ...doc.data() };
+            })
+            .sort(function(first, second) {
+                return dateToMillis(second.createdAt) - dateToMillis(first.createdAt);
+            });
+
+        displayMyRequests();
+
+    } catch (error) {
+
+        console.error(error);
+
+        document.getElementById("requestsSignIn").classList.add("hidden");
+        document.getElementById("myRequests").classList.remove("hidden");
+
+        showMessage(
+            "myRequests",
+            "Couldn't load your requests. Refresh the page to try again."
+        );
+    }
+}
+
+
+// A short explanation for each claim status.
+function statusMessage(status, forFriend) {
+
+    if (status === "Pending") {
+        return "An employee will compare your description with the item.";
+    }
+
+    if (status === "Approved" && forFriend) {
+        return "Approved! Your friend can pick it up at the lost & found desk with a photo ID.";
+    }
+
+    if (status === "Approved") {
+        return "Approved! Bring a photo ID to the lost & found desk to pick it up.";
+    }
+
+    if (status === "Rejected") {
+        return "This request wasn't approved. Contact the lost & found desk if you have questions.";
+    }
+
+    if (status === "Picked up") {
+        return "This item was picked up.";
+    }
+
+    return "";
+}
+
+
+function displayMyRequests() {
+
+    const signInBox = document.getElementById("requestsSignIn");
+    const list = document.getElementById("myRequests");
+
+
+    if (!currentUser) {
+
+        signInBox.classList.remove("hidden");
+        list.classList.add("hidden");
+        list.innerHTML = "";
+
+        return;
+    }
+
+
+    signInBox.classList.add("hidden");
+    list.classList.remove("hidden");
+
+
+    if (myClaims.length === 0) {
+
+        list.innerHTML = `
+            <p>
+                You haven't claimed any items yet. Find yours under
+                <strong>Found Items</strong> and press "This Might Be Mine".
+            </p>
+        `;
+
+        return;
+    }
+
+
+    list.innerHTML = "";
+
+    myClaims.forEach(function(claim) {
+
+        const friendLine = claim.forFriend
+            ? `<p><strong>For your friend:</strong> ${escapeHtml(claim.friendName)}</p>`
+            : "";
+
+        const noteLine = claim.adminNote
+            ? `<p><strong>Note from the desk:</strong> ${escapeHtml(claim.adminNote)}</p>`
+            : "";
+
+        list.innerHTML += `
+
+            <div class="report-card">
+
+                ${statusBadge(claim.status)}
+
+                <h4>${escapeHtml(claim.itemName)}</h4>
+
+                ${friendLine}
+
+                <p>
+                    <strong>Sent:</strong>
+                    ${escapeHtml(formatDate(claim.createdAt))}
+                </p>
+
+                <p>
+                    <strong>What you said:</strong>
+                    ${escapeHtml(claim.verification)}
+                </p>
+
+                ${noteLine}
+
+                <p class="status-note">
+                    ${escapeHtml(statusMessage(claim.status, claim.forFriend))}
+                </p>
+
+            </div>
+
+        `;
+
+    });
 }
 
 
@@ -1322,6 +2154,26 @@ function showLoginError(message) {
 }
 
 
+// Employees have a users/{uid} document with role "admin". These are
+// only created by hand in the Firebase console.
+// Returns { name, email } for employees, or null for everyone else.
+async function getEmployeeProfile(user) {
+
+    const userDoc =
+        await getDoc(doc(db, "users", user.uid));
+
+    if (userDoc.exists() && userDoc.data().role === "admin") {
+
+        return {
+            name: userDoc.data().name || user.email,
+            email: user.email
+        };
+    }
+
+    return null;
+}
+
+
 loginForm.addEventListener(
     "submit",
     async function(event) {
@@ -1339,15 +2191,29 @@ loginForm.addEventListener(
 
         try {
 
-            await signInWithEmailAndPassword(
-                auth,
-                document.getElementById("loginEmail").value,
-                document.getElementById("loginPassword").value
-            );
+            const credential =
+                await signInWithEmailAndPassword(
+                    auth,
+                    document.getElementById("loginEmail").value,
+                    document.getElementById("loginPassword").value
+                );
 
             loginForm.reset();
 
-            // onAuthStateChanged (below) shows the dashboard.
+            // A real account, but not an employee: don't keep it signed in here.
+            const employee =
+                await getEmployeeProfile(credential.user);
+
+            if (!employee) {
+
+                showLoginError(
+                    "This account isn't on the employee list. Ask the site admin to add it."
+                );
+
+                await signOut(auth);
+            }
+
+            // For employees, onAuthStateChanged (below) shows the dashboard.
 
         } catch (error) {
 
@@ -1355,8 +2221,14 @@ loginForm.addEventListener(
 
             if (error.code === "auth/too-many-requests") {
                 showLoginError("Too many tries. Wait a few minutes and try again.");
-            } else {
+            } else if (error.code === "auth/unauthorized-domain") {
+                showLoginError("This website address isn't allowed to log in yet (Firebase console → Authentication → Settings → Authorized domains).");
+            } else if (error.code === "auth/network-request-failed") {
+                showLoginError("Couldn't reach Firebase. Check your internet connection.");
+            } else if (String(error.code).startsWith("auth/")) {
                 showLoginError("Wrong email or password.");
+            } else {
+                showLoginError("Couldn't check your account. Please try again.");
             }
 
         } finally {
@@ -1378,9 +2250,10 @@ document.getElementById("logoutBtn").addEventListener(
 
 
 // Firebase calls this when the page opens and every time someone
-// logs in or out.
+// signs in or out (students with Google, employees with email + password).
 onAuthStateChanged(auth, async function(user) {
 
+    currentUser = user;
     currentEmployee = null;
 
 
@@ -1388,41 +2261,24 @@ onAuthStateChanged(auth, async function(user) {
 
         try {
 
-            // Employees have a users/{uid} document with role "admin".
-            // These are only created by hand in the Firebase console.
-            const userDoc =
-                await getDoc(doc(db, "users", user.uid));
-
-            if (userDoc.exists() && userDoc.data().role === "admin") {
-
-                currentEmployee = {
-                    name: userDoc.data().name || user.email,
-                    email: user.email
-                };
-
-            } else {
-
-                showLoginError(
-                    "This account isn't on the employee list. Ask the site admin to add it."
-                );
-
-                await signOut(auth);
-
-                return;
-            }
+            currentEmployee = await getEmployeeProfile(user);
 
         } catch (error) {
 
+            // Couldn't check: treat them as a student for now.
             console.error(error);
-
-            showLoginError("Couldn't check your account. Please try again.");
-
-            return;
         }
 
     }
 
 
+    // Student parts of the page: header, claim popup, My Requests.
+    updateAuthArea();
+    updateClaimModal();
+    await loadMyRequests();
+
+
+    // Employee parts of the page.
     if (currentEmployee) {
 
         document.getElementById("employeeName").textContent =
@@ -1442,8 +2298,10 @@ onAuthStateChanged(auth, async function(user) {
         lostReports = [];
         claims = [];
         itemSecrets = {};
+        pickups = [];
         displayLostReports();
         displayClaims();
+        displayPickups();
     }
 
 });
