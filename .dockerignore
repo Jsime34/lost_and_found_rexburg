@@ -1,0 +1,15 @@
+# Files Docker doesn't need when building the image (the Dockerfile only uses
+# nginx.conf and public/). Keeping them out makes builds faster and smaller.
+.git
+.gitignore
+.firebase
+.firebaserc
+firebase.json
+firestore.rules
+firestore.indexes.json
+*.log
+docs
+*.md
+Dockerfile
+docker-compose.yml
+.dockerignore
