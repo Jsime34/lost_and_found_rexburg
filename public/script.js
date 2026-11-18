@@ -42,6 +42,8 @@ import {
 
 // Time counter shown on each found-item card.
 import { timeCounterText } from "./js/time.js";
+import { LOCATIONS, getLocationHoldDays } from "./js/locations.js";
+import { initLocationMap } from "./js/map.js";
 
 
 // Public data (everyone). Filled in by loadEverything().
@@ -74,7 +76,7 @@ const sampleItems = [
         name: "Black Backpack",
         category: "Bags",
         color: "Black",
-        location: "Library",
+        location: "Rigby Hall",
         foundOn: "2026-09-29",
         description: "Black backpack found near the second-floor study area.",
         privateDetails: "Contains a Dell laptop with a Star Wars sticker.",
@@ -85,7 +87,7 @@ const sampleItems = [
         name: "Wireless Earbuds",
         category: "Electronics",
         color: "White",
-        location: "Gym",
+        location: "Rigby Hall",
         foundOn: "2026-09-30",
         description: "Wireless earbuds found near the basketball courts.",
         privateDetails: "Case has initials written underneath.",
@@ -96,7 +98,7 @@ const sampleItems = [
         name: "Car Keys",
         category: "Keys",
         color: "Black",
-        location: "Student Union",
+        location: "Rigby Hall",
         foundOn: "2026-09-30",
         description: "Set of vehicle keys found near the food court.",
         privateDetails: "Specific vehicle manufacturer and unique keychain.",
@@ -107,7 +109,7 @@ const sampleItems = [
         name: "Water Bottle",
         category: "Other",
         color: "Blue",
-        location: "Science Building",
+        location: "Rigby Hall",
         foundOn: "2026-09-28",
         description: "Blue insulated water bottle found in a classroom.",
         privateDetails: "Several specific stickers are attached.",
@@ -118,7 +120,7 @@ const sampleItems = [
         name: "Gray Hoodie",
         category: "Clothing",
         color: "Gray",
-        location: "Library",
+        location: "Rigby Hall",
         foundOn: "2026-09-27",
         description: "Gray hoodie found on a chair near the entrance.",
         privateDetails: "Specific university logo and size.",
@@ -129,7 +131,7 @@ const sampleItems = [
         name: "Smartphone",
         category: "Electronics",
         color: "Black",
-        location: "Business Building",
+        location: "Rigby Hall",
         foundOn: "2026-09-30",
         description: "Black smartphone found in a classroom.",
         privateDetails: "Cracked corner and unique lock-screen image.",
@@ -418,6 +420,11 @@ function showPage(pageId) {
 
 
     window.scrollTo(0, 0);
+
+    if (pageId === "map") {
+        initLocationMap(foundItems, showItemsAtLocation);
+        displayLocationCards();
+    }
 }
 
 
@@ -475,7 +482,10 @@ function getIcon(category) {
 
 function createItemCard(item) {
 
-    const timeText = timeCounterText(item.foundAt);
+    const timeText = timeCounterText(
+        item.foundAt,
+        getLocationHoldDays(item.location)
+    );
     const itemVisual = item.photo
         ? `<img src="${escapeHtml(item.photo)}" alt="Photo of ${escapeHtml(item.name)}">`
         : escapeHtml(item.icon);
@@ -1830,7 +1840,52 @@ function updateStats() {
     document.getElementById(
         "placesCount"
     ).textContent = places.size;
+}
 
+
+function displayLocationCards() {
+
+    const container =
+        document.getElementById("locationCards");
+
+    if (!container) {
+        return;
+    }
+
+    container.innerHTML = LOCATIONS.map(function(location) {
+
+        const itemCount =
+            foundItems.filter(function(item) {
+                return item.location === location.name ||
+                    item.location === location.shortName;
+            }).length;
+
+        return `
+            <div class="location-card">
+                <h3>${escapeHtml(location.shortName)}</h3>
+                <p><strong>Hours:</strong> ${escapeHtml(location.hours)}</p>
+                <p><strong>Hold period:</strong> ${location.holdDays} days</p>
+                <p><strong>Items here:</strong> ${itemCount}</p>
+                <button type="button" class="primary-btn map-items-btn" data-location="${escapeHtml(location.name)}">
+                    See items here
+                </button>
+            </div>
+        `;
+    }).join("");
+
+    container.querySelectorAll(".map-items-btn").forEach(function(button) {
+        button.addEventListener("click", function() {
+            showItemsAtLocation(button.dataset.location);
+        });
+    });
+}
+
+
+function showItemsAtLocation(locationName) {
+
+    locationFilter.value = locationName;
+    filterItems();
+    showPage("browse");
 }
 
 

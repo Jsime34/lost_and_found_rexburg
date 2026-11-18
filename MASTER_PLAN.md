@@ -179,17 +179,17 @@ If these aren't pushed by Fri Nov 20, Jaime takes them over on the weekend (Nov 
 - New files `public/js/locations.js`, `public/js/map.js`
 
 **Deadline Fri Nov 20** (the map is a feature we promised in our submission)
-- [ ] (human) Find the real lost & found desks: which buildings run one, their hours, and how long they keep items. Start with the Manwaring Center information desk. Write them in `docs/locations.md`.
-- [ ] `js/locations.js` (the map and Evan's location filter need it):
+- [x] Find the real lost & found desk: its office, hours, and how long it keeps items. Write them in `docs/locations.md`.
+- [x] `js/locations.js` (the map and Evan's location filter need it):
   - It's a list of the desks: name, latitude/longitude, hours, and `holdDays` (how long items are kept).
   - Replace the made-up "Library / Student Union / Science Building / Gym / Business Building" options in all 3 location dropdowns with the real ones.
 - [x] `js/time.js`: **taken over and done by Jaime (Oct 28)** so Evan wasn't blocked. When `locations.js` has `holdDays` per desk, pass it as the second argument of `timeCounterText` / `daysLeft`.
-- [ ] **Promised feature #4:** Map page:
+- [x] **Promised feature #4:** Map page:
   - add a **Map** nav button and a `#map` section
   - use Leaflet + OpenStreetMap, loaded from their links
   - each desk gets a marker showing its hours and number of items
   - a "See items here" button opens Found Items filtered to that location
-- [ ] Mobile fix: on short screens the claim popup can't scroll, so its **Submit Claim** button is out of reach. Add `overflow-y: auto` to `.modal` in `styles.css`.
+- [x] Mobile fix: on short screens the claim popup can scroll, so its **Submit Claim** button stays reachable. Added `overflow-y: auto` to `.modal` in `styles.css`.
 - [ ] Check every section at phone width (375 px).
 - [ ] When this is done, help Evan or Trevor, whoever is behind. (WS4 is done.)
 

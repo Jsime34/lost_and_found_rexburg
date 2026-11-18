@@ -25,7 +25,7 @@ Fields marked *(planned)* don't exist yet. The person in brackets adds them.
 | `name` | text | `"Blue Hydro Flask"` | max 100 characters |
 | `category` | text | `"Electronics"` | one of: Electronics, Bags, Keys, Clothing, Accessories, Other |
 | `color` | text | `"Blue"` | |
-| `location` | text | `"Library"` | where it's being kept |
+| `location` | text | `"Rigby Hall"` | where it's being kept |
 | `foundAt` | timestamp | | when it was found; drives the time counter |
 | `description` | text | `"32oz bottle with dents"` | what the public can see |
 | `icon` | text | `"🥤"` | emoji shown when there's no photo |
