@@ -145,13 +145,16 @@ const sampleItems = [
 // Makes text safe to put inside HTML. Anyone can type into our forms, so
 // without this someone could type HTML (or a <script>) and it would run
 // on other people's screens.
+// Quotes are escaped too, because some text goes inside attributes like
+// value="..." (a " in someone's text would otherwise end the attribute early).
 function escapeHtml(text) {
 
-    const div = document.createElement("div");
-
-    div.textContent = text ?? "";
-
-    return div.innerHTML;
+    return String(text ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
 }
 
 
