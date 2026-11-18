@@ -228,6 +228,7 @@ If these aren't pushed by Fri Nov 20, Jaime takes them over on the weekend (Nov 
 - [x] Pickup log panel for employees: every pickup, newest first. It can't be edited or deleted from the website.
 - [x] Rules for `pickups` and the claim updates (Trevor reviews).
 - [x] Security fix: `escapeHtml()` escapes quotes too (#9).
+- [x] nginx container (requested for the project): `Dockerfile`, `nginx.conf`, `docker-compose.yml`, `.dockerignore`; run with `docker compose up --build` → http://localhost:8080 (see README).
 
 **Weeks 8–10**
 - [ ] Deploy (`firebase deploy` from `main`) so Evan's Nov 11 work and the security fix go live.
@@ -283,6 +284,7 @@ Everything here is free, with no credit card (Firebase **Spark** plan).
 | Database | **Firebase Firestore**, protected by `firestore.rules` |
 | Login | **Firebase Authentication** (email + password), for employees only |
 | Going live | **Firebase Hosting**, deployed with `firebase deploy` |
+| Container | **nginx** in Docker (`docker compose up --build` → http://localhost:8080): serves the same `public/` folder; an extra way to run the site, the live site stays on Firebase Hosting |
 | Map | **Leaflet + OpenStreetMap**, loaded from a link; no API key |
 | Photos | Shrunk in the browser and saved in Firestore (see §7 for why not Firebase Storage) |
 | Tools | **VS Code** + the **Live Server** extension, **Git + GitHub** |
@@ -341,6 +343,8 @@ public/
   js/pickups.js     claims review + pickups (new)          Jaime
 firestore.rules     database security rules                Trevor (shared)
 firebase.json, .firebaserc  Firebase settings              Evan   (shared)
+Dockerfile, nginx.conf, docker-compose.yml, .dockerignore
+                    nginx container                        Jaime  (shared)
 docs/DATA.md        collections and fields                 Jaime  (shared)
 MASTER_PLAN.md      this plan                              Jaime
 ```

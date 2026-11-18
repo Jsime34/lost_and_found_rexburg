@@ -1,0 +1,10 @@
+# Start the website in an nginx container:   docker compose up --build
+# Open it at:                                http://localhost:8080
+# Stop it:                                   docker compose down
+
+services:
+  web:
+    build: .
+    ports:
+      - "8080:80"   # your computer's port 8080 → nginx's port 80 inside the container
+    restart: unless-stopped
